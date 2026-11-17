@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import { android } from '../../app/android.js'
 import { useIsMobile } from '../../app/viewport.js'
 import { useTranslate } from '../../i18n/index.js'
 import type { Session } from '../../services/chat/types.js'
@@ -37,7 +38,9 @@ export const SessionView = ({
         footer={
           <div className={styles.inputContainer}>
             <ChatInput sessionId={session.id} />
-            <div className={styles.caveat}>{t('contentCaveat')}</div>
+            <div className={styles.caveat}>
+              {t(android ? 'androidContentCaveat' : 'contentCaveat')}
+            </div>
           </div>
         }
       />

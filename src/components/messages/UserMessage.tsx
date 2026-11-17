@@ -1,14 +1,18 @@
 import { useTranslate } from '../../i18n/index.js'
 import clsx from 'clsx'
 import { memo, useLayoutEffect, useRef, useState } from 'react'
+import { android } from '../../app/android.js'
 import { useIsMobile } from '../../app/viewport.js'
-import { IconEditOutline16 } from '../base/icons.js'
+import { IconCopyOutline16, IconEditOutline16 } from '../base/icons.js'
 import { editMessage, retryUpload } from '../../services/chat/store.js'
 import { stopReadAloud } from '../../services/speech/readAloud.js'
 import type { UserMessage as UserMessageType } from '../../services/chat/types.js'
 import { Button } from '../base/Button.js'
 import { IconButton } from '../base/IconButton.js'
+import { Menu } from '../base/Menu.js'
+import { showToast } from '../base/toastState.js'
 import { ensureApiKey } from '../settings/settingsDialogState.js'
+import { copyText } from '../../utils/clipboard.js'
 import {
   BranchSwitcher,
   type MessageVersions,
@@ -42,6 +46,7 @@ export const UserMessage = memo(function UserMessage({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.content)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const menuTriggerRef = useRef<HTMLButtonElement>(null)
   const isMobile = useIsMobile()
   const canSend = !busy && (draft.trim() !== '' || message.files.length > 0)
 
@@ -57,6 +62,13 @@ export const UserMessage = memo(function UserMessage({
     if (canSend && ensureApiKey() && editMessage(sessionId, message.id, draft.trim())) {
       stopReadAloud()
       setEditing(false)
+    }
+  }
+
+  const startEdit = () => {
+    if (!busy) {
+      setDraft(message.content)
+      setEditing(true)
     }
   }
 
@@ -112,23 +124,82 @@ export const UserMessage = memo(function UserMessage({
         </div>
       ) : (
         <>
-          {message.content ? <div className={styles.bubble}>{message.content}</div> : null}
-          <div className={styles.bottom}>
-            <div className={clsx(styles.actions, isLast && styles.alwaysShow)}>
-              {message.content ? <CopyButton text={message.content} /> : null}
-              <IconButton
-                icon={<IconEditOutline16 />}
-                tooltip={t('editMessage')}
-                tooltipPlacement="bottom"
-                disabled={busy}
-                onClick={() => {
-                  setDraft(message.content)
-                  setEditing(true)
-                }}
-              />
+          {message.content ? (
+            <div
+              className={styles.bubble}
+              role={android ? 'button' : undefined}
+              tabIndex={android ? 0 : undefined}
+              aria-disabled={android && busy ? true : undefined}
+              onClick={android ? startEdit : undefined}
+              onKeyDown={(event) => {
+                if (android && (event.key === 'Enter' || event.key === ' ')) {
+                  event.preventDefault()
+                  startEdit()
+                }
+              }}
+              onContextMenu={(event) => {
+                if (android) {
+                  event.preventDefault()
+                  menuTriggerRef.current?.click()
+                }
+              }}
+            >
+              {message.content}
+              {android ? (
+                <Menu
+                  options={[
+                    {
+                      key: 'copy',
+                      label: t('copy'),
+                      icon: <IconCopyOutline16 />,
+                      onSelect: () => {
+                        void copyText(message.content).then((copied) =>
+                          showToast({ key: copied ? 'copied' : 'copyFailed' })
+                        )
+                      },
+                    },
+                    {
+                      key: 'edit',
+                      label: t('androidEditMessage'),
+                      icon: <IconEditOutline16 />,
+                      onSelect: startEdit,
+                    },
+                  ]}
+                >
+                  {({ toggle }) => (
+                    <button
+                      ref={menuTriggerRef}
+                      className={styles.menuTrigger}
+                      type="button"
+                      aria-hidden="true"
+                      tabIndex={-1}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        toggle()
+                      }}
+                    />
+                  )}
+                </Menu>
+              ) : null}
             </div>
-            <BranchSwitcher versions={versions} disabled={busy} onSelect={onSelectVersion} />
-          </div>
+          ) : null}
+          {!android || versions.ids.length > 1 ? (
+            <div className={styles.bottom}>
+              {!android ? (
+                <div className={clsx(styles.actions, isLast && styles.alwaysShow)}>
+                  {message.content ? <CopyButton text={message.content} /> : null}
+                  <IconButton
+                    icon={<IconEditOutline16 />}
+                    tooltip={t('editMessage')}
+                    tooltipPlacement="bottom"
+                    disabled={busy}
+                    onClick={startEdit}
+                  />
+                </div>
+              ) : null}
+              <BranchSwitcher versions={versions} disabled={busy} onSelect={onSelectVersion} />
+            </div>
+          ) : null}
         </>
       )}
     </div>

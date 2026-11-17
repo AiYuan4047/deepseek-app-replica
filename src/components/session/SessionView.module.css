@@ -64,6 +64,14 @@
   padding-bottom: var(--android-composer-bottom);
 }
 
+[data-android]:not([data-keyboard]) .inputContainer {
+  padding-bottom: 0;
+}
+
+[data-android] .caveat {
+  color: color-mix(in srgb, var(--dsw-alias-label-tertiary) 26%, var(--dsw-alias-bg-base));
+}
+
 @media not all and (min-width: 768px) {
   .inputContainer {
     position: relative;

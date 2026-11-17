@@ -13,6 +13,14 @@
   }
 }
 
+[data-android] .container {
+  padding-bottom: 20px;
+}
+
+[data-android] .container.isFirst {
+  padding-top: 22px;
+}
+
 .files {
   display: flex;
   flex-wrap: wrap;
@@ -38,6 +46,28 @@
   background-color: var(--dsw-specific-bubble);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+[data-android] .bubble {
+  position: relative;
+  max-width: calc(100% - 48px);
+  margin-right: -4px;
+  padding-block: 10px;
+  border-radius: 22px 22px 4px 22px;
+  line-height: 26px;
+  user-select: none;
+}
+
+.menuTrigger {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 @media not all and (min-width: 440px) {

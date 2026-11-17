@@ -11,6 +11,10 @@
   }
 }
 
+[data-android] .message {
+  padding-left: 4px;
+}
+
 .waiting {
   display: flex;
   align-items: center;
