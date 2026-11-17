@@ -349,6 +349,15 @@ public final class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void openSourcePage(String url, boolean dark, String closeLabel, String browserLabel) {
+            Uri uri = SourceBrowserActivity.webUri(url);
+            if (uri == null) return;
+            runOnUiThread(() -> startActivity(new Intent(MainActivity.this, SourceBrowserActivity.class)
+                .setData(uri).putExtra("dark", dark)
+                .putExtra("closeLabel", closeLabel).putExtra("browserLabel", browserLabel)));
+        }
+
+        @JavascriptInterface
         public String readApiKey() { return keys.read(); }
 
         @JavascriptInterface

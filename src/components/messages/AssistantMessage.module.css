@@ -141,3 +141,13 @@
     --search-row-site-logo-color: var(--dsw-alias-interactive-bg-hover);
   }
 }
+
+[data-android] .summary {
+  padding: 5px 12px 5px 14px;
+  color: #545557;
+  font-size: 15px;
+}
+
+[data-android] body[data-ds-dark-theme] .summary {
+  color: #e5e5e5;
+}

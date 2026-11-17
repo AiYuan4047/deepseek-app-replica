@@ -39,6 +39,7 @@ export const zh = {
   sessionItemMenuRenameOption: '重命名',
   more: '更多',
   close: '关闭',
+  openInBrowser: '在浏览器中打开',
   sessionHistoryTimelineLabelToday: '今天',
   sessionHistoryTimelineLabelYesterday: '昨天',
   sessionHistoryTimelineLabel7days: '7 天内',

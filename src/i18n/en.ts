@@ -43,6 +43,7 @@ export const en = {
   sessionItemMenuRenameOption: 'Rename',
   more: 'More',
   close: 'Close',
+  openInBrowser: 'Open in browser',
   sessionHistoryTimelineLabelToday: 'Today',
   sessionHistoryTimelineLabelYesterday: 'Yesterday',
   sessionHistoryTimelineLabel7days: '7 Days',
