@@ -17,6 +17,21 @@ android {
         versionCode = 1
         versionName = '0.1.0'
     }
+
+    signingConfigs {
+        release {
+            storeFile file('release.jks')
+            storePassword 'deepseek-replica'
+            keyAlias 'dsreplica'
+            keyPassword 'deepseek-replica'
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
+    }
 }
 
 def webProject = rootProject.projectDir.parentFile
