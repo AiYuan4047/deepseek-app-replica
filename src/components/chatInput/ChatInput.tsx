@@ -35,6 +35,7 @@ import { useVoiceInput } from './useVoiceInput.js'
 import { VoiceButton } from './VoiceButton.js'
 import { Spectrum } from './Spectrum.js'
 import { AndroidAttachments } from './AndroidAttachments.js'
+import { AndroidDraftAttachments } from './AndroidDraftAttachments.js'
 import { AndroidVoiceOverlay } from './AndroidVoiceOverlay.js'
 import { useHoldToTalk } from './useHoldToTalk.js'
 import { useTranslate } from '../../i18n/index.js'
@@ -54,6 +55,12 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const { text, attachments } = draft
   const setText = (value: string) => setDraftText(sessionId, value)
   const draftReady = useUploads((state) => prepareDraftMessage(draft, state.tasks) !== null)
+  const imagesUploading = useUploads((state) =>
+    attachments.some(
+      (item) =>
+        item.isImage && (!state.tasks[item.id] || state.tasks[item.id].status === 'uploading')
+    )
+  )
   const streaming = useChatStore(
     (state) => sessionId !== null && Object.hasOwn(state.streaming, sessionId)
   )
@@ -86,11 +93,16 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
     return () => observer.disconnect()
   }, [t])
 
-  const acceptFiles = (files: File[]) => {
+  const acceptFiles = (files: File[], recentPhotoId?: string) => {
     if (files.length === 0 || useChatStore.getState().importingHistory || !ensureApiKey()) {
       return
     }
-    const error = addDraftFiles(sessionId, files, useSettings.getState().apiKey ?? '')
+    const error = addDraftFiles(
+      sessionId,
+      files,
+      useSettings.getState().apiKey ?? '',
+      recentPhotoId
+    )
     if (error) {
       showToast(error)
     }
@@ -189,6 +201,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
     if (!ensureApiKey() || !sendMessage(sessionId)) {
       return
     }
+    setShowAttachments(false)
     stopReadAloud()
     if (isMobile) {
       textareaRef.current?.blur()
@@ -212,7 +225,25 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
           }
         }}
       >
-        <DraftAttachments items={attachments} onRetry={retryFile} onRemove={removeFile} />
+        {android ? (
+          <AndroidDraftAttachments
+            items={attachments}
+            suggestions={!text.trim() && attachments.some((item) => item.isImage)}
+            loading={imagesUploading}
+            canSend={canSend}
+            onRetry={retryFile}
+            onRemove={removeFile}
+            onSuggestion={(message) => {
+              if (!canSend || getDraft(sessionId).text.trim()) {
+                return
+              }
+              setText(message)
+              send()
+            }}
+          />
+        ) : (
+          <DraftAttachments items={attachments} onRetry={retryFile} onRemove={removeFile} />
+        )}
         <div className={styles.textareaWrapper}>
           {android && voiceMode ? (
             <button
@@ -339,7 +370,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
                     setShowAttachments(!showAttachments)
                   }}
                 />
-                {draftReady ? null : (
+                {draftReady && (attachments.length === 0 || text.trim()) ? null : (
                   <IconButton
                     size="xl"
                     tone="primary"
@@ -420,6 +451,15 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
         <>
           <AndroidAttachments
             open={showAttachments}
+            selectedPhotos={
+              new Map(
+                attachments.flatMap((item) =>
+                  item.recentPhotoId ? [[item.recentPhotoId, item.id] as const] : []
+                )
+              )
+            }
+            onRecentFile={(file, photoId) => acceptFiles([file], photoId)}
+            onRemove={removeFile}
             onFiles={(files) => {
               setShowAttachments(false)
               acceptFiles(files)

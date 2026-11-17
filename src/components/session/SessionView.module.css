@@ -76,6 +76,10 @@
   display: none;
 }
 
+[data-android] .inputContainer:has([data-attachment-panel][data-open='true']) .caveat {
+  visibility: hidden;
+}
+
 @media not all and (min-width: 768px) {
   .inputContainer {
     position: relative;

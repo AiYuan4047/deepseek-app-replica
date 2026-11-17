@@ -17,6 +17,8 @@ export type DraftAttachment = {
   file: File
   isImage: boolean
   previewUrl: string | null
+  /** 最近图片的本地媒体 ID，用于与选择面板同步选中状态。 */
+  recentPhotoId?: string
 }
 
 type Draft = { text: string; attachments: DraftAttachment[] }
@@ -61,7 +63,8 @@ const upload = (attachment: DraftAttachment, apiKey: string) => {
 export const addDraftFiles = (
   sessionId: string | null,
   files: File[],
-  apiKey: string
+  apiKey: string,
+  recentPhotoId?: string
 ): TranslationMessage | null => {
   if (files.length === 0) {
     return null
@@ -77,6 +80,7 @@ export const addDraftFiles = (
       file,
       isImage: image,
       previewUrl: image ? URL.createObjectURL(file) : null,
+      recentPhotoId: files.length === 1 ? recentPhotoId : undefined,
     }
   })
   updateDraft(sessionId, (draft) => ({ ...draft, attachments: [...draft.attachments, ...added] }))

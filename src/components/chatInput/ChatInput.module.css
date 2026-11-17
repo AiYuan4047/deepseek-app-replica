@@ -346,6 +346,128 @@
     0 1px 4px rgb(0 0 0 / 4%);
 }
 
+.androidPreview,
+.quickSuggestions {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 300ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.androidPreview[data-expanded='true'],
+.quickSuggestions[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+
+.androidPreviewContent,
+.quickSuggestionsClip {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.androidPreview[data-expanded='false'] {
+  pointer-events: none;
+
+  .attachments {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+
+[data-android] .attachments {
+  padding: 9px 9px 0;
+  transition:
+    opacity 240ms ease,
+    transform 300ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+[data-android] .attachment {
+  width: 80px;
+  height: 80px;
+  animation: android-attachment-enter 210ms linear 90ms backwards;
+}
+
+[data-android] .remove {
+  top: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  opacity: 1;
+  background: #606164;
+}
+
+@keyframes android-attachment-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.quickSuggestionsList {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 14px 9px 3.6px;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  button,
+  .quickSuggestionSkeleton {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--dsw-alias-border-l2);
+    border-radius: 10px;
+    color: var(--dsw-alias-label-secondary);
+    background: transparent;
+    font: inherit;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  button {
+    gap: 6px;
+
+    svg {
+      width: 16px;
+      height: 16px;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.5;
+    }
+  }
+
+  .quickSuggestionSkeleton {
+    width: 96px;
+    background: color-mix(in srgb, currentColor 4%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .androidPreview,
+  .quickSuggestions,
+  [data-android] .attachments {
+    transition: none;
+  }
+
+  [data-android] .attachment {
+    animation: none;
+  }
+}
+
 [data-android] .textarea,
 [data-android] .mirror {
   min-height: 56px;
@@ -396,6 +518,12 @@
 
 [data-android] .right {
   gap: 0;
+}
+
+[data-android] .sendButton {
+  width: 30px;
+  height: 30px;
+  margin-right: 7px;
 }
 
 .holdButton {

@@ -15,10 +15,12 @@ export const DraftAttachments = memo(function DraftAttachments({
   items,
   onRetry,
   onRemove,
+  exiting = false,
 }: {
   items: DraftAttachment[]
   onRetry: (id: string) => void
   onRemove: (id: string) => void
+  exiting?: boolean
 }) {
   if (items.length === 0) {
     return null
@@ -29,6 +31,7 @@ export const DraftAttachments = memo(function DraftAttachments({
         <AttachmentItem
           key={item.id}
           item={item}
+          exiting={exiting}
           onRetry={() => onRetry(item.id)}
           onRemove={() => onRemove(item.id)}
         />
@@ -40,19 +43,22 @@ export const DraftAttachments = memo(function DraftAttachments({
 /** 输入框里的文件：图片显示缩略图，其余显示文件卡片 */
 const AttachmentItem = ({
   item,
+  exiting,
   onRetry,
   onRemove,
 }: {
   item: DraftAttachment
+  exiting: boolean
   onRetry: () => void
   onRemove: () => void
 }) => {
   const t = useTranslate()
   const task = useUploads((state) => state.tasks[item.id] ?? UPLOADING)
-  const status = task.status
-  const error = task.status === 'error' ? t(task.error.key, task.error.params) : undefined
+  const status = exiting ? 'done' : task.status
+  const error =
+    !exiting && task.status === 'error' ? t(task.error.key, task.error.params) : undefined
   // 过大、格式不支持等重试无效的失败只提示原因，需删除后再发送
-  const retry = task.status === 'error' && task.retryable ? onRetry : undefined
+  const retry = !exiting && task.status === 'error' && task.retryable ? onRetry : undefined
   const failed = status === 'error'
   const retryLabel = t('uploadRetry', { message: error ?? t('uploadFileStatusFailed') })
   // 「上传失败」只显示重试图标，其余原因写在图片上：可重试时在图标下方，不可重试时贴底

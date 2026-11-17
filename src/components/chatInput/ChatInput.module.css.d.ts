@@ -2,6 +2,12 @@ declare const styles: {
   readonly composer: string
   readonly holdButton: string
   readonly recordingCard: string
+  readonly androidPreview: string
+  readonly androidPreviewContent: string
+  readonly quickSuggestions: string
+  readonly quickSuggestionsClip: string
+  readonly quickSuggestionsList: string
+  readonly quickSuggestionSkeleton: string
   readonly wrapper: string
   readonly session: string
   readonly home: string

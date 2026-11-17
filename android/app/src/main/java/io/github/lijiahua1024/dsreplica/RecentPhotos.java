@@ -5,7 +5,7 @@ import android.content.ContentUris;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.net.Uri;
-import android.os.Bundle;
+import android.os.ParcelFileDescriptor;
 import android.provider.MediaStore;
 import android.util.Size;
 import android.webkit.WebResourceResponse;
@@ -13,8 +13,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -25,7 +25,7 @@ final class RecentPhotos {
         "Content-Security-Policy", "default-src 'none'; sandbox",
         "X-Content-Type-Options", "nosniff",
         "Cache-Control", "no-store");
-    private final Map<String, Photo> photos = new ConcurrentHashMap<>();
+    private volatile Map<String, Photo> photos = Map.of();
     private final ContentResolver resolver;
 
     RecentPhotos(ContentResolver resolver) {
@@ -33,31 +33,39 @@ final class RecentPhotos {
     }
 
     String list() {
-        photos.clear();
+        Map<String, Photo> nextPhotos = new HashMap<>();
         JSONArray result = new JSONArray();
-        Bundle args = new Bundle();
-        args.putInt(ContentResolver.QUERY_ARG_LIMIT, 20);
-        args.putStringArray(ContentResolver.QUERY_ARG_SORT_COLUMNS,
-            new String[]{MediaStore.Images.Media.DATE_ADDED, MediaStore.Images.Media._ID});
-        args.putInt(ContentResolver.QUERY_ARG_SORT_DIRECTION, ContentResolver.QUERY_SORT_DIRECTION_DESCENDING);
         String[] columns = {MediaStore.Images.Media._ID, MediaStore.Images.Media.DISPLAY_NAME,
             MediaStore.Images.Media.MIME_TYPE};
-        try (Cursor rows = resolver.query(IMAGES, columns, args, null)) {
-            if (rows == null) return "[]";
-            while (result.length() < 20 && rows.moveToNext()) {
+        String order = MediaStore.Images.Media.DATE_ADDED + " DESC, "
+            + MediaStore.Images.Media._ID + " DESC";
+        try (Cursor rows = resolver.query(IMAGES, columns, null, null, order)) {
+            if (rows == null) {
+                photos = Map.of();
+                return "[]";
+            }
+            while (result.length() < 20 && !Thread.currentThread().isInterrupted() && rows.moveToNext()) {
                 long id = rows.getLong(0);
                 String key = Long.toString(id);
                 String name = rows.getString(1);
                 String type = rows.getString(2);
                 if (name == null || type == null || !type.startsWith("image/")) continue;
+                Uri uri = ContentUris.withAppendedId(IMAGES, id);
+                // 媒体库可能仍保留已删除文件的索引；跳过这些条目，继续查找可用图片。
+                try (ParcelFileDescriptor descriptor = resolver.openFileDescriptor(uri, "r")) {
+                    if (descriptor == null) continue;
+                } catch (IOException | SecurityException ignored) {
+                    continue;
+                }
                 JSONObject photo = new JSONObject().put("id", key).put("name", name).put("type", type);
-                photos.put(key, new Photo(ContentUris.withAppendedId(IMAGES, id), type));
+                nextPhotos.put(key, new Photo(uri, type));
                 result.put(photo);
             }
         } catch (SecurityException | JSONException ignored) {
-            photos.clear();
+            photos = Map.of();
             return "[]";
         }
+        photos = Map.copyOf(nextPhotos);
         return result.toString();
     }
 

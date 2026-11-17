@@ -32,6 +32,8 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public final class MainActivity extends Activity {
     private static final String ASSET_HOST = "appassets.androidplatform.net";
@@ -52,6 +54,7 @@ public final class MainActivity extends Activity {
     private RecentPhotos recentPhotos;
     private HistoryExport historyExport;
     private NativeRecorder recorder;
+    private final ExecutorService photoExecutor = Executors.newSingleThreadExecutor();
 
     @Override
     public void onCreate(Bundle state) {
@@ -223,12 +226,17 @@ public final class MainActivity extends Activity {
         return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
     }
 
+    private boolean hasRecentPhotosPermission() {
+        String imagesPermission = Build.VERSION.SDK_INT >= 33 ? Manifest.permission.READ_MEDIA_IMAGES
+            : Manifest.permission.READ_EXTERNAL_STORAGE;
+        return granted(imagesPermission) || (Build.VERSION.SDK_INT >= 34
+            && granted(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED));
+    }
+
     private void showRecentPhotos() {
         String imagesPermission = Build.VERSION.SDK_INT >= 33 ? Manifest.permission.READ_MEDIA_IMAGES
             : Manifest.permission.READ_EXTERNAL_STORAGE;
-        boolean partial = Build.VERSION.SDK_INT >= 34
-            && granted(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED);
-        if (!partial && !granted(imagesPermission) && !askedForPhotos) {
+        if (!hasRecentPhotosPermission() && !askedForPhotos) {
             askedForPhotos = true;
             String[] permissions = Build.VERSION.SDK_INT >= 34
                 ? new String[]{imagesPermission, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED}
@@ -240,7 +248,15 @@ public final class MainActivity extends Activity {
     }
 
     private void notifyRecentPhotos() {
-        webView.evaluateJavascript("window.dispatchEvent(new Event('android-photos'))", null);
+        photoExecutor.execute(() -> {
+            String photos = recentPhotos.list();
+            runOnUiThread(() -> {
+                if (!isFinishing() && !isDestroyed()) {
+                    webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('android-photos', "
+                        + "{detail: " + photos + "}))", null);
+                }
+            });
+        });
     }
 
     private void launchCamera() {
@@ -315,6 +331,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        photoExecutor.shutdownNow();
         if (fileCallback != null) fileCallback.onReceiveValue(null);
         recorder.finish(false);
         historyExport.close();
@@ -370,7 +387,9 @@ public final class MainActivity extends Activity {
         public void requestRecentPhotos() { runOnUiThread(() -> showRecentPhotos()); }
 
         @JavascriptInterface
-        public String readRecentPhotos() { return recentPhotos.list(); }
+        public void prefetchRecentPhotos() {
+            runOnUiThread(() -> { if (hasRecentPhotosPermission()) notifyRecentPhotos(); });
+        }
 
         @JavascriptInterface
         public void requestHistoryExport(String fileName) {

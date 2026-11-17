@@ -3,7 +3,6 @@ import { android } from '../../app/android.js'
 import { useTranslate } from '../../i18n/index.js'
 import { ACCEPT } from '../../services/attachments.js'
 import { AndroidAttachment } from '../base/AndroidIcons.js'
-import { IconPaperclipOutline16 } from '../base/icons.js'
 import { showToast } from '../base/toastState.js'
 import styles from './AndroidAttachments.module.css'
 
@@ -13,17 +12,31 @@ type Source = 'camera' | 'gallery' | 'files'
 export const AndroidAttachments = ({
   open,
   onFiles,
+  selectedPhotos,
+  onRecentFile,
+  onRemove,
 }: {
   open: boolean
   onFiles: (files: File[]) => void
+  selectedPhotos: ReadonlyMap<string, string>
+  onRecentFile: (file: File, photoId: string) => void
+  onRemove: (attachmentId: string) => void
 }) => {
   const t = useTranslate()
   const camera = useRef<HTMLInputElement>(null)
   const gallery = useRef<HTMLInputElement>(null)
   const documents = useRef<HTMLInputElement>(null)
   const panel = useRef<HTMLElement>(null)
-  const loadingPhoto = useRef(false)
+  const loadingPhotos = useRef(new Map<string, AbortController>())
   const [photos, setPhotos] = useState<Photo[]>([])
+  const [loadingIds, setLoadingIds] = useState<Set<string>>(() => new Set())
+  useEffect(
+    () => () => {
+      loadingPhotos.current.forEach((controller) => controller.abort())
+      loadingPhotos.current.clear()
+    },
+    []
+  )
   useEffect(() => {
     if (panel.current) {
       panel.current.inert = !open
@@ -32,30 +45,58 @@ export const AndroidAttachments = ({
 
   useEffect(() => {
     const device = android
-    if (!open || !device) {
+    if (!device) {
       return
     }
-    const update = () => setPhotos(JSON.parse(device.readRecentPhotos()) as Photo[])
+    const update = (event: Event) => setPhotos((event as CustomEvent<Photo[]>).detail)
     window.addEventListener('android-photos', update)
-    device.requestRecentPhotos()
+    device.prefetchRecentPhotos()
     return () => window.removeEventListener('android-photos', update)
+  }, [])
+
+  useEffect(() => {
+    if (open) {
+      android?.requestRecentPhotos()
+    }
   }, [open])
 
   const chooseRecent = async (photo: Photo) => {
-    if (loadingPhoto.current) {
+    const selectedId = selectedPhotos.get(photo.id)
+    if (selectedId) {
+      onRemove(selectedId)
       return
     }
-    loadingPhoto.current = true
+    const pending = loadingPhotos.current.get(photo.id)
+    if (pending) {
+      pending.abort()
+      loadingPhotos.current.delete(photo.id)
+      setLoadingIds(new Set(loadingPhotos.current.keys()))
+      return
+    }
+    const controller = new AbortController()
+    loadingPhotos.current.set(photo.id, controller)
+    setLoadingIds(new Set(loadingPhotos.current.keys()))
     try {
-      const response = await fetch(`/recent/${photo.id}`, { cache: 'no-store' })
+      const response = await fetch(`/recent/${photo.id}`, {
+        cache: 'no-store',
+        signal: controller.signal,
+      })
       if (!response.ok) {
         throw new Error('Photo unavailable')
       }
-      onFiles([new File([await response.blob()], photo.name, { type: photo.type })])
+      const blob = await response.blob()
+      if (!controller.signal.aborted) {
+        onRecentFile(new File([blob], photo.name, { type: photo.type }), photo.id)
+      }
     } catch {
-      showToast({ key: 'uploadParseFailed' })
+      if (!controller.signal.aborted) {
+        showToast({ key: 'uploadParseFailed' })
+      }
     } finally {
-      loadingPhoto.current = false
+      if (loadingPhotos.current.get(photo.id) === controller) {
+        loadingPhotos.current.delete(photo.id)
+        setLoadingIds(new Set(loadingPhotos.current.keys()))
+      }
     }
   }
 
@@ -66,28 +107,50 @@ export const AndroidAttachments = ({
   ] satisfies { kind: Source; label: string; ref: typeof camera; accept: string }[]
 
   return (
-    <section ref={panel} className={styles.panel} data-open={open} aria-label={t('uploadFile')}>
+    <section
+      ref={panel}
+      className={styles.panel}
+      data-open={open}
+      data-attachment-panel=""
+      aria-label={t('uploadFile')}
+    >
       <div className={styles.content}>
         {photos.length > 0 ? (
           <div className={styles.recent}>
-            {photos.map((photo) => (
-              <button
-                key={photo.id}
-                type="button"
-                aria-label={photo.name}
-                onClick={() => void chooseRecent(photo)}
-              >
-                <img src={`/thumbnail/${photo.id}`} alt="" loading="lazy" />
-                <span aria-hidden="true" />
-              </button>
-            ))}
+            {photos.map((photo) => {
+              const selected = selectedPhotos.has(photo.id) || loadingIds.has(photo.id)
+              return (
+                <button
+                  key={photo.id}
+                  type="button"
+                  aria-label={photo.name}
+                  aria-pressed={selected}
+                  data-selected={selected}
+                  onClick={() => void chooseRecent(photo)}
+                >
+                  <img
+                    src={`/thumbnail/${photo.id}`}
+                    alt=""
+                    loading="lazy"
+                    onError={() =>
+                      setPhotos((current) => current.filter((item) => item.id !== photo.id))
+                    }
+                  />
+                  <span aria-hidden="true">
+                    <svg viewBox="0 0 16 16">
+                      <path d="m3.2 8.2 3 3 6.6-6.6" />
+                    </svg>
+                  </span>
+                </button>
+              )
+            })}
           </div>
         ) : null}
         <div className={styles.actions}>
           {actions.map(({ kind, label, ref, accept }) => (
             <div key={kind}>
               <button type="button" onClick={() => ref.current?.click()}>
-                {kind === 'files' ? <IconPaperclipOutline16 /> : <AndroidAttachment kind={kind} />}
+                <AndroidAttachment kind={kind} />
                 {label}
               </button>
               <input

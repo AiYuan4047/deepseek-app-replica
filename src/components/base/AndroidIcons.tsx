@@ -40,7 +40,7 @@ export const AndroidCircle = ({ icon }: { icon: 'add' | 'close' | 'voice' | 'key
   </svg>
 )
 
-export const AndroidAttachment = ({ kind }: { kind: 'camera' | 'gallery' }) => (
+export const AndroidAttachment = ({ kind }: { kind: 'camera' | 'gallery' | 'files' }) => (
   <svg
     width="20"
     height="20"
@@ -48,21 +48,25 @@ export const AndroidAttachment = ({ kind }: { kind: 'camera' | 'gallery' }) => (
     fill="none"
     aria-hidden="true"
     stroke="currentColor"
-    strokeWidth="1.8"
+    strokeWidth="2.25"
     strokeLinejoin="round"
     strokeLinecap="round"
   >
     {kind === 'camera' ? (
       <>
-        <path d="M3 7h4l2-3h6l2 3h4v13H3z" />
-        <circle cx="12" cy="13" r="3.2" />
+        <path d="M7.5 4.6 8.3 3A2.3 2.3 0 0 1 10.4 2h3.2a2.3 2.3 0 0 1 2.1 1l.8 1.6h2.2A3.3 3.3 0 0 1 22 7.9v10.5a3.3 3.3 0 0 1-3.3 3.3H5.3A3.3 3.3 0 0 1 2 18.4V7.9a3.3 3.3 0 0 1 3.3-3.3z" />
+        <circle cx="12" cy="13" r="4" />
       </>
-    ) : (
+    ) : null}
+    {kind === 'gallery' ? (
       <>
-        <rect x="3" y="4" width="18" height="16" rx="3" />
-        <circle cx="15.8" cy="9" r="1.5" />
-        <path d="m4 15 4-4 7 8" />
+        <rect x="2" y="3" width="20" height="18" rx="3.4" />
+        <circle cx="16.1" cy="8.4" r="1.6" />
+        <path d="m2.7 16 2.8-2.8a3 3 0 0 1 4.2 0l7.6 7.6" />
       </>
-    )}
+    ) : null}
+    {kind === 'files' ? (
+      <path d="m21 11.1-9 9a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 1 1-2.8-2.8l8.3-8.3" />
+    ) : null}
   </svg>
 )
