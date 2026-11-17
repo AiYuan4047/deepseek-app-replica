@@ -247,7 +247,22 @@
 }
 
 [data-android] .drawer {
-  z-index: 1;
+  z-index: 0;
+  width: var(--drawer-edge);
+  padding-top: var(--android-status-inset, 0px);
+  transform: translateX(calc((var(--drawer-progress) - 1) * 100%));
+  transition: transform var(--drawer-transition);
+  box-sizing: border-box;
+}
+
+[data-android] .drawer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: calc(0.207 * (1 - var(--drawer-progress)));
+  pointer-events: none;
+  transition: opacity var(--drawer-transition);
 }
 
 [data-android] .drawerMask {
@@ -255,7 +270,7 @@
 }
 
 [data-android] .mobile {
-  width: var(--drawer-edge);
+  width: 100%;
   max-width: none;
   padding: 12px 24px 16px 16px;
   border: 0;
@@ -263,6 +278,20 @@
 
   .listWrap {
     margin-top: 16px;
+  }
+
+  .sectionHeader {
+    padding-inline: 7px;
+    font-weight: 400;
+    background: var(--dsw-alias-bg-base);
+  }
+
+  .section {
+    margin-top: 7px;
+
+    &:first-child {
+      margin-top: 0;
+    }
   }
 
   .bottom {
@@ -278,6 +307,56 @@
     height: 32px;
     border-radius: 50%;
     background: var(--dsw-alias-bg-skeleton);
+    color: #a2a5a8;
+    overflow: hidden;
+  }
+
+  .settingsLabel {
+    flex: 1;
+  }
+}
+
+.selectChats {
+  position: absolute;
+  top: 6px;
+  right: 1px;
+  z-index: 25;
+}
+
+.selectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 48px;
+  flex-shrink: 0;
+
+  button {
+    background: var(--dsw-alias-bg-base);
+    box-shadow: 0 1px 8px #0002;
+  }
+}
+
+.selectionActions {
+  display: flex;
+  width: 100%;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+
+  button {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 42px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 15px;
+
+    &:disabled {
+      opacity: 0.35;
+    }
   }
 }
 

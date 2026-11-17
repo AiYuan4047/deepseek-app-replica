@@ -1,14 +1,17 @@
 import clsx from 'clsx'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { android } from '../../app/android.js'
 import { useTranslate } from '../../i18n/index.js'
 import {
   IconPanelLeftOutline16,
   IconSearchOutline16,
   IconSettingsOutline16,
+  IconCloseOutline16,
+  IconEllipsisOutline16,
+  IconTrashOutline16,
   NewChatIcon,
 } from '../base/icons.js'
-import { setSiderCollapsed } from '../../services/settings.js'
+import { setPinnedSessions, setSiderCollapsed, useSettings } from '../../services/settings.js'
 import { groupSessions } from '../../services/chat/sessionGroups.js'
 import { newChat, removeSession, useChatStore } from '../../services/chat/store.js'
 import type { SessionSummary } from '../../services/chat/types.js'
@@ -27,13 +30,41 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   const t = useTranslate()
   const sessions = useChatStore((state) => state.sessions)
   const activeId = useChatStore((state) => state.activeId)
+  const pinnedIds = useSettings((state) => state.pinnedSessions)
   const androidDrawer = Boolean(mobile && android)
   const [query, setQuery] = useState('')
   const matches = useSessionSearch(query, sessions)
   const [now, setNow] = useState(Date.now)
-  const groups = useMemo(() => groupSessions(matches, now, t), [matches, now, t])
-  const [deleting, setDeleting] = useState<SessionSummary | null>(null)
+  const [selecting, setSelecting] = useState(false)
+  const [checked, setChecked] = useState<Set<string>>(() => new Set())
+  const unpin = checked.size > 0 && [...checked].every((id) => pinnedIds.includes(id))
+  const groups = useMemo(() => {
+    if (!androidDrawer || pinnedIds.length === 0) {
+      return groupSessions(matches, now, t)
+    }
+    const pinned = matches.filter((session) => pinnedIds.includes(session.id))
+    const rest = groupSessions(
+      matches.filter((session) => !pinnedIds.includes(session.id)),
+      now,
+      t
+    )
+    return pinned.length
+      ? [{ key: 'pinned', label: t('androidPinned'), sessions: pinned }, ...rest]
+      : rest
+  }, [androidDrawer, matches, now, pinnedIds, t])
+  const [deleting, setDeleting] = useState<SessionSummary[]>([])
   const [deletePending, setDeletePending] = useState(false)
+  const drawerOpen = useMobileSider((state) => state.open)
+  const closeSelection = () => {
+    setSelecting(false)
+    setChecked(new Set())
+  }
+
+  useEffect(() => {
+    if (!drawerOpen) {
+      closeSelection()
+    }
+  }, [drawerOpen])
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
@@ -61,7 +92,17 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
 
   return (
     <div className={clsx(styles.sider, mobile && styles.mobile)}>
-      {androidDrawer ? (
+      {androidDrawer && selecting ? (
+        <div className={styles.selectionHeader}>
+          {t('androidSelectChats')}
+          <IconButton
+            tone="primary"
+            icon={<IconCloseOutline16 />}
+            aria-label={t('close')}
+            onClick={closeSelection}
+          />
+        </div>
+      ) : androidDrawer ? (
         <label className={styles.search}>
           <IconSearchOutline16 />
           <input
@@ -100,6 +141,27 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
         </>
       )}
       <div className={styles.listWrap}>
+        {androidDrawer && !selecting ? (
+          <IconButton
+            className={styles.selectChats}
+            icon={
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 18 18"
+                fill="none"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <circle cx="4" cy="5" r="1.6" />
+                <circle cx="4" cy="13" r="1.6" />
+                <path d="M8 5h7M8 13h7" strokeWidth="1.2" />
+              </svg>
+            }
+            aria-label={t('androidSelectChats')}
+            onClick={() => setSelecting(true)}
+          />
+        ) : null}
         <div className={styles.list}>
           {groups.map((group) => (
             <div key={group.key} className={styles.section}>
@@ -109,7 +171,25 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
                   key={session.id}
                   session={session}
                   active={session.id === activeId}
-                  onDelete={() => setDeleting(session)}
+                  onDelete={() => setDeleting([session])}
+                  selection={
+                    selecting
+                      ? {
+                          checked: checked.has(session.id),
+                          toggle: () => {
+                            setChecked((previous) => {
+                              const next = new Set(previous)
+                              if (next.has(session.id)) {
+                                next.delete(session.id)
+                              } else {
+                                next.add(session.id)
+                              }
+                              return next
+                            })
+                          },
+                        }
+                      : undefined
+                  }
                 />
               ))}
             </div>
@@ -117,24 +197,82 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
         </div>
       </div>
       <div className={styles.bottom}>
-        <button type="button" className={styles.settings} onClick={() => openSettings('general')}>
-          <span className={styles.settingsIcon}>
-            <IconSettingsOutline16 />
-          </span>
-          <span className={styles.settingsLabel}>{t('settings')}</span>
-        </button>
+        {selecting ? (
+          <div className={styles.selectionActions}>
+            <button
+              type="button"
+              disabled={!checked.size}
+              onClick={() => {
+                setPinnedSessions(
+                  unpin
+                    ? pinnedIds.filter((id) => !checked.has(id))
+                    : [...new Set([...pinnedIds, ...checked])]
+                )
+                closeSelection()
+              }}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 18 18"
+                fill="none"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path d="m6 7 4-4 3 3-4 4-1 3-2-2-3 3-1-1 3-3-2-2z" />
+              </svg>
+              {t(unpin ? 'androidUnpin' : 'androidPinned')}
+            </button>
+            <button
+              type="button"
+              disabled={!checked.size}
+              onClick={() => setDeleting(sessions.filter((session) => checked.has(session.id)))}
+            >
+              <IconTrashOutline16 />
+              {t('delete')}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={styles.settings}
+            aria-label={t('settings')}
+            onClick={() => openSettings('general')}
+          >
+            <span className={styles.settingsIcon}>
+              {androidDrawer ? (
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="8" r="4.15" />
+                  <path d="M3 23a9 7 0 0 1 18 0z" />
+                </svg>
+              ) : (
+                <IconSettingsOutline16 />
+              )}
+            </span>
+            <span className={styles.settingsLabel}>
+              {androidDrawer ? 'API Key' : t('settings')}
+            </span>
+            {androidDrawer ? <IconEllipsisOutline16 /> : null}
+          </button>
+        )}
       </div>
-      {deleting ? (
+      {deleting.length ? (
         <Modal
           title={t('deleteSessionModalContentTitle')}
           onClose={() => {
             if (!deletePending) {
-              setDeleting(null)
+              setDeleting([])
             }
           }}
           footer={
             <>
-              <Button variant="outlined" disabled={deletePending} onClick={() => setDeleting(null)}>
+              <Button variant="outlined" disabled={deletePending} onClick={() => setDeleting([])}>
                 {t('cancel')}
               </Button>
               <Button
@@ -143,10 +281,23 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
                 onClick={async () => {
                   setDeletePending(true)
                   try {
-                    if (await removeSession(deleting.id)) {
-                      setDeleting(null)
-                    } else {
+                    const remaining: SessionSummary[] = []
+                    const deleted = new Set<string>()
+                    for (const session of deleting) {
+                      if (await removeSession(session.id)) {
+                        deleted.add(session.id)
+                      } else {
+                        remaining.push(session)
+                      }
+                    }
+                    setDeleting(remaining)
+                    if (deleted.size) {
+                      setPinnedSessions(pinnedIds.filter((id) => !deleted.has(id)))
+                    }
+                    if (remaining.length) {
                       showToast({ key: 'sessionDeleteFailed', type: 'error' })
+                    } else {
+                      closeSelection()
                     }
                   } finally {
                     setDeletePending(false)
@@ -168,13 +319,19 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
 /** 移动端抽屉：浮在页面上方，点空白区域关闭。 */
 export const MobileSider = () => {
   const open = useMobileSider((state) => state.open)
-  if (!open) {
+  const drawer = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (drawer.current) {
+      drawer.current.inert = !open
+    }
+  }, [open])
+  if (!android && !open) {
     return null
   }
   return (
     <>
-      <div className={styles.drawerMask} onClick={closeMobileSider} />
-      <div className={styles.drawer}>
+      {open ? <div className={styles.drawerMask} onClick={closeMobileSider} /> : null}
+      <div className={styles.drawer} ref={drawer} data-android-drawer={android ? '' : undefined}>
         <Sider mobile />
       </div>
     </>

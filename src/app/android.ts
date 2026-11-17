@@ -1,4 +1,7 @@
 type AndroidBridge = {
+  statusInset: () => number
+  systemFontScale: () => number
+  openAppPermissions: () => void
   readApiKey: () => string | null
   writeApiKey: (value: string | null) => boolean
   setDarkBars: (dark: boolean) => void

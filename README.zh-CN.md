@@ -21,6 +21,12 @@ node scripts/compare-pixels.mjs captures/official/home.png captures/replica/home
 
 对于录屏，可用 `--frames 参考帧,复刻帧` 选取两边从零起算的解码帧。Android 的 MP4 录屏存在有损编码和可变间隔，可用于比较动画轨迹与时间。静态画面是否逐像素一致，以 `adb exec-out screencap -p` 输出的 PNG 为准。脚本返回 0 表示匹配，1 表示存在像素差异，2 表示输入或解码错误。
 
+在 1080×2340 参考机上打开待测 App 的聊天页，从关闭的抽屉开始运行以下命令。脚本通过测试机现有的 `su` 权限按下、移动、停顿并截图。最后一档会反向拖动，并在松开后另存一张状态图。对两个 App 使用相同参数，即可对比每次停顿。
+
+```powershell
+.\scripts\capture-drawer-pauses.ps1 -Device 192.168.1.78:5555 -OutputDirectory captures/replica/drawer-pauses
+```
+
 [English](README.md) | 简体中文
 
 基于 DeepSeek API 的静态聊天示例。无需应用后端，浏览器直接请求配置的 API 服务。

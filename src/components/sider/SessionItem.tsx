@@ -1,5 +1,6 @@
 import clsx from 'clsx'
-import { memo, useState } from 'react'
+import { memo, useRef, useState } from 'react'
+import { android } from '../../app/android.js'
 import { useTranslate } from '../../i18n/index.js'
 import { IconEditOutline16, IconEllipsisOutline16, IconTrashOutline16 } from '../base/icons.js'
 import { renameSession, selectSession } from '../../services/chat/store.js'
@@ -13,14 +14,32 @@ export const SessionItem = memo(function SessionItem({
   session,
   active,
   onDelete,
+  selection,
 }: {
   session: SessionSummary
   active: boolean
   onDelete: () => void
+  selection?: { checked: boolean; toggle: () => void }
 }) {
   const t = useTranslate()
   const [editing, setEditing] = useState(false)
+  const actionsRef = useRef<HTMLDivElement>(null)
   const displayTitle = session.title || t('untitledChat')
+
+  if (selection) {
+    return (
+      <button
+        className={styles.select}
+        type="button"
+        role="checkbox"
+        aria-checked={selection.checked}
+        onClick={selection.toggle}
+      >
+        <span aria-hidden="true" />
+        <div className={styles.title}>{displayTitle}</div>
+      </button>
+    )
+  }
 
   if (editing) {
     const finish = (title: string) => {
@@ -50,13 +69,19 @@ export const SessionItem = memo(function SessionItem({
   return (
     <div
       className={clsx(styles.item, active && styles.active)}
+      onContextMenu={(event) => {
+        if (android) {
+          event.preventDefault()
+          actionsRef.current?.querySelector('button')?.click()
+        }
+      }}
       onClick={() => {
         selectSession(session.id)
         closeMobileSider()
       }}
     >
       <div className={styles.title}>{displayTitle}</div>
-      <div className={styles.action} onClick={(event) => event.stopPropagation()}>
+      <div ref={actionsRef} className={styles.action} onClick={(event) => event.stopPropagation()}>
         <Menu
           options={[
             {

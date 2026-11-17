@@ -1,6 +1,10 @@
 [data-android] body {
   --dsw-font-family: Roboto, 'Noto Sans CJK SC', sans-serif;
   --android-composer-bottom: 27px;
+  --dsw-font-markdown-base: calc(16px * var(--android-chat-font-scale, 1)) /
+    calc(28px * var(--android-chat-font-scale, 1)) var(--dsw-font-family);
+  --dsw-font-markdown-base-strong: 600 calc(16px * var(--android-chat-font-scale, 1)) /
+    calc(28px * var(--android-chat-font-scale, 1)) var(--dsw-font-family);
 }
 
 [data-android][data-keyboard] body {

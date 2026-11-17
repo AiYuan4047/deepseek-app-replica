@@ -6,6 +6,7 @@
   height: 100dvh;
   overflow: auto;
   padding: 24px;
+  padding-top: calc(24px + var(--android-status-inset, 0px));
 }
 
 .form {

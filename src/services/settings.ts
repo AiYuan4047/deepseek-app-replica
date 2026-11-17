@@ -4,6 +4,7 @@ import type { TtsVoice } from './api/speech.js'
 import { normalizeLocation, type UserLocation } from './location.js'
 
 export type Locale = 'zh-CN' | 'en-US'
+export type LocalePreference = Locale | 'system'
 
 /** 主题偏好；默认跟随系统 */
 export type ThemePreference = 'light' | 'dark' | 'system'
@@ -12,6 +13,7 @@ export type ThemePreference = 'light' | 'dark' | 'system'
 type Settings = {
   apiKey: string | null
   locale: Locale
+  localePreference: LocalePreference
   themePreference: ThemePreference
   location: UserLocation | null
   ttsVoice: TtsVoice
@@ -19,6 +21,9 @@ type Settings = {
   thinking: boolean
   search: boolean
   siderCollapsed: boolean
+  fontSize: number | null
+  foldThinking: boolean
+  pinnedSessions: string[]
 }
 
 const KEYS = {
@@ -31,6 +36,9 @@ const KEYS = {
   thinking: 'chat-demo:thinking',
   search: 'chat-demo:search',
   siderCollapsed: 'chat-demo:sider-collapsed',
+  fontSize: 'replica:font-size',
+  foldThinking: 'replica:fold-thinking',
+  pinnedSessions: 'replica:pinned-sessions',
 } as const
 
 const read = (key: string) => {
@@ -57,12 +65,32 @@ const write = (key: string, value: string | null) => {
 export const isChineseBrowser = (): boolean =>
   (typeof navigator === 'undefined' ? 'zh' : navigator.language).toLowerCase().startsWith('zh')
 
-const initialLocale = (): Locale => {
+const initialLocalePreference = (): LocalePreference => {
   const saved = read(KEYS.locale)
   if (saved === 'zh-CN' || saved === 'en-US') {
     return saved
   }
-  return isChineseBrowser() ? 'zh-CN' : 'en-US'
+  return 'system'
+}
+
+const resolveLocale = (preference: LocalePreference): Locale =>
+  preference === 'system' ? (isChineseBrowser() ? 'zh-CN' : 'en-US') : preference
+
+const initialFontSize = () => {
+  const saved = read(KEYS.fontSize)
+  if (saved === 'system') {
+    return null
+  }
+  return saved !== null && /^[0-6]$/.test(saved) ? Number(saved) : 3
+}
+
+const initialPinnedSessions = (): string[] => {
+  try {
+    const value: unknown = JSON.parse(read(KEYS.pinnedSessions) ?? '[]')
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : []
+  } catch {
+    return []
+  }
 }
 
 const initialLocation = (): UserLocation | null => {
@@ -92,7 +120,8 @@ const initialTtsVoice = (): TtsVoice => (read(KEYS.ttsVoice) === 'tide' ? 'tide'
 
 export const useSettings = create<Settings>(() => ({
   apiKey: android ? android.readApiKey() : read(KEYS.apiKey),
-  locale: initialLocale(),
+  locale: resolveLocale(initialLocalePreference()),
+  localePreference: initialLocalePreference(),
   location: initialLocation(),
   themePreference: initialThemePreference(),
   ttsVoice: initialTtsVoice(),
@@ -100,13 +129,29 @@ export const useSettings = create<Settings>(() => ({
   thinking: read(KEYS.thinking) === 'true',
   search: (read(KEYS.search) ?? (android ? 'true' : 'false')) === 'true',
   siderCollapsed: read(KEYS.siderCollapsed) === 'true',
+  fontSize: initialFontSize(),
+  foldThinking: read(KEYS.foldThinking) !== 'false',
+  pinnedSessions: initialPinnedSessions(),
 }))
 
-export const setLocale = (locale: Locale) => {
-  write(KEYS.locale, locale)
-  useSettings.setState({ locale })
+export const setPinnedSessions = (pinnedSessions: string[]) => {
+  write(KEYS.pinnedSessions, JSON.stringify(pinnedSessions))
+  useSettings.setState({ pinnedSessions })
+}
+export const setLocale = (localePreference: LocalePreference) => {
+  write(KEYS.locale, localePreference)
+  useSettings.setState({ localePreference, locale: resolveLocale(localePreference) })
 }
 
+export const setFontSize = (fontSize: number | null) => {
+  write(KEYS.fontSize, fontSize?.toString() ?? 'system')
+  useSettings.setState({ fontSize })
+}
+
+export const setFoldThinking = (foldThinking: boolean) => {
+  write(KEYS.foldThinking, String(foldThinking))
+  useSettings.setState({ foldThinking })
+}
 export const setLocation = (value: UserLocation | null) => {
   const location = normalizeLocation(value)
   write(KEYS.location, location ? JSON.stringify(location) : null)

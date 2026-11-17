@@ -14,6 +14,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.webkit.JavascriptInterface;
@@ -45,6 +46,7 @@ public final class MainActivity extends Activity {
     private ApiKeyStore keys;
     private ValueCallback<Uri[]> fileCallback;
     private boolean keyboardVisible;
+    private volatile float statusInset;
     private boolean askedForPhotos;
     private Uri capture;
     private RecentPhotos recentPhotos;
@@ -64,7 +66,13 @@ public final class MainActivity extends Activity {
         frame.setOnApplyWindowInsetsListener((view, insets) -> {
             Insets safe = insets.getInsets(WindowInsets.Type.systemBars()
                 | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
-            view.setPadding(safe.left, safe.top, safe.right, safe.bottom);
+            view.setPadding(safe.left, 0, safe.right, safe.bottom);
+            float top = safe.top / getResources().getDisplayMetrics().density;
+            if (top != statusInset) {
+                statusInset = top;
+                webView.evaluateJavascript("document.documentElement?.style.setProperty("
+                    + "'--android-status-inset', '" + top + "px')", null);
+            }
             boolean ime = insets.isVisible(WindowInsets.Type.ime());
             if (ime != keyboardVisible) {
                 keyboardVisible = ime;
@@ -328,6 +336,18 @@ public final class MainActivity extends Activity {
     }
 
     private final class DeviceBridge {
+        @JavascriptInterface
+        public float statusInset() { return statusInset; }
+
+        @JavascriptInterface
+        public float systemFontScale() { return getResources().getConfiguration().fontScale; }
+
+        @JavascriptInterface
+        public void openAppPermissions() {
+            runOnUiThread(() -> startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts("package", getPackageName(), null))));
+        }
+
         @JavascriptInterface
         public String readApiKey() { return keys.read(); }
 

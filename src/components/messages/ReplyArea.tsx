@@ -1,4 +1,6 @@
 import { useTranslate } from '../../i18n/index.js'
+import { android } from '../../app/android.js'
+import { useSettings } from '../../services/settings.js'
 import clsx from 'clsx'
 import { memo, useEffect, useState, type ReactNode } from 'react'
 import {
@@ -65,7 +67,9 @@ export const ReplyArea = memo(function ReplyArea({
   hasResponse: boolean
 }) {
   useTranslate()
-  const [open, setOpen] = useState(true)
+  const fold = useSettings((state) => state.foldThinking)
+  const [override, setOverride] = useState<boolean>()
+  const open = override ?? (!android || !fold || !hasResponse)
   const titleActive = streaming && !hasResponse
   useTicker(titleActive, 1000)
   if (view.steps.length === 0 && !(message.thinking && streaming)) {
@@ -78,7 +82,7 @@ export const ReplyArea = memo(function ReplyArea({
   return (
     <div className={styles.area}>
       {title ? (
-        <div className={styles.title} onClick={() => setOpen((value) => !value)}>
+        <div className={styles.title} onClick={() => setOverride(!open)}>
           <span className={clsx(styles.titleIcon, stopped && styles.stoppedIcon)}>
             <IconThinkOutline16 />
           </span>

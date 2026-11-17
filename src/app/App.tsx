@@ -15,8 +15,9 @@ import { closeSearchPanel, useSearchPanel } from '../components/search/searchPan
 import { SessionView } from '../components/session/SessionView.js'
 import { MobileHeader } from '../components/session/MobileHeader.js'
 import { Welcome } from '../components/session/Welcome.js'
-import { ensureApiKey } from '../components/settings/settingsDialogState.js'
+import { ensureApiKey, useSettingsDialog } from '../components/settings/settingsDialogState.js'
 import { SettingsDialog } from '../components/settings/SettingsDialog.js'
+import { AndroidSettings } from '../components/settings/AndroidSettings.js'
 import { ApiKeyScreen } from '../components/settings/ApiKeyScreen.js'
 import { Toast } from '../components/base/Toast.js'
 import { showToast } from '../components/base/toastState.js'
@@ -26,6 +27,7 @@ import { stopReadAloud } from '../services/speech/readAloud.js'
 import { CollapsedSider } from '../components/sider/CollapsedSider.js'
 import { closeMobileSider, useMobileSider } from '../components/sider/mobileSiderState.js'
 import { MobileSider, Sider } from '../components/sider/Sider.js'
+import { useAndroidDrawerGesture } from '../components/sider/useAndroidDrawerGesture.js'
 import styles from './App.module.css'
 
 export const App = () => {
@@ -33,7 +35,9 @@ export const App = () => {
   const isMobile = useIsMobile()
   const apiKey = useSettings((state) => state.apiKey)
   const drawerOpen = useMobileSider((state) => state.open)
+  const drawerGesture = useAndroidDrawerGesture()
   const locale = useSettings((state) => state.locale)
+  const fontSize = useSettings((state) => state.fontSize)
   // 移动端侧边栏以独立抽屉管理开合状态
   const siderCollapsed = useSettings((state) => state.siderCollapsed) && !isMobile
   const ready = useChatStore((state) => state.ready)
@@ -60,6 +64,13 @@ export const App = () => {
     document.documentElement.lang = locale
   }, [locale])
 
+  useEffect(() => {
+    if (android) {
+      const size = fontSize === null ? android.systemFontScale() : 1 + (fontSize - 3) * 0.09
+      document.documentElement.style.setProperty('--android-chat-font-scale', String(size))
+    }
+  }, [fontSize])
+
   // 文件数、存储空间达到上限时，附件上只显示「上传失败」，原因用 toast 说明
   useEffect(() => onUploadNotice(showToast), [])
   useEffect(bindChatPersistence, [])
@@ -84,6 +95,9 @@ export const App = () => {
       return
     }
     const onBack = (event: Event) => {
+      if (useSettingsDialog.getState().open) {
+        return
+      }
       if (document.querySelector('[role="dialog"]')) {
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
       } else if (useSearchPanel.getState().entry) {
@@ -105,7 +119,12 @@ export const App = () => {
 
   return (
     <>
-      <div ref={frameRef} className={styles.frame} data-drawer-open={drawerOpen}>
+      <div
+        ref={frameRef}
+        className={styles.frame}
+        data-drawer-open={drawerOpen}
+        {...(android ? drawerGesture : {})}
+      >
         {isMobile ? <MobileSider /> : siderCollapsed ? null : <Sider />}
         <main className={styles.main}>
           {saveError ? (
@@ -162,7 +181,7 @@ export const App = () => {
         </main>
         <SearchPanel />
       </div>
-      <SettingsDialog />
+      {android ? <AndroidSettings /> : <SettingsDialog />}
       <Toast />
     </>
   )
