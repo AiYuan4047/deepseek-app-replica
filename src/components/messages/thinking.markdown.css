@@ -94,3 +94,11 @@
     }
   }
 }
+
+[data-android] .ds-think-content .ds-markdown {
+  --dsw-font-markdown-small: calc(15px * var(--android-chat-font-scale, 1)) /
+    calc(24px * var(--android-chat-font-scale, 1)) var(--dsw-font-family);
+  --dsw-font-markdown-small-strong: 600 calc(15px * var(--android-chat-font-scale, 1)) /
+    calc(24px * var(--android-chat-font-scale, 1)) var(--dsw-font-family);
+  color: var(--android-thinking-text);
+}

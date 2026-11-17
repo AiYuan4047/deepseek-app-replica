@@ -76,7 +76,8 @@ export const AssistantMessage = memo(function AssistantMessage({
     }
     wasStreaming.current = streaming
   }, [isLast, message.id, message.stopReason, responseText, streaming])
-  const waiting = streaming && view.steps.length === 0 && !view.answer && !message.thinking
+  const waiting =
+    streaming && view.steps.length === 0 && !view.answer && (android || !message.thinking)
   const summaryEntry = `${message.id}-summary`
   return (
     <div className={styles.message}>

@@ -2,7 +2,7 @@ import { useTranslate } from '../../i18n/index.js'
 import { android } from '../../app/android.js'
 import { useSettings } from '../../services/settings.js'
 import clsx from 'clsx'
-import { memo, useEffect, useState, type ReactNode } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
   IconBrowseOutline16,
   IconBrowseWarningOutline16,
@@ -34,6 +34,7 @@ import { Tooltip } from '../base/Tooltip.js'
 import { Markdown } from '../markdown/Markdown.js'
 import { SiteThumbnails } from '../search/SiteLogo.js'
 import { toggleSearchPanel, useSearchPanel } from '../search/searchPanelState.js'
+import { useStopFollowing } from './scrollContext.js'
 import styles from './ReplyArea.module.css'
 import './thinking.markdown.css'
 
@@ -49,6 +50,8 @@ const useTicker = (active: boolean, interval: number) => {
   }, [active, interval])
   return tick
 }
+
+const ANDROID_THINKING_PREVIEW_HEIGHT = 128
 
 /**
  * 思考与工具步骤的时间线：
@@ -69,40 +72,179 @@ export const ReplyArea = memo(function ReplyArea({
   useTranslate()
   const fold = useSettings((state) => state.foldThinking)
   const [override, setOverride] = useState<boolean>()
+  const [streamExpanded, setStreamExpanded] = useState(false)
+  const [previewOverflow, setPreviewOverflow] = useState(false)
+  const [retainPreview, setRetainPreview] = useState(false)
+  const previewRef = useRef<HTMLDivElement>(null)
+  const stepsRef = useRef<HTMLDivElement>(null)
+  const clipRef = useRef<HTMLDivElement>(null)
+  const stopFollowing = useStopFollowing()
   const open = override ?? (!android || !fold || !hasResponse)
   const titleActive = streaming && !hasResponse
-  useTicker(titleActive, 1000)
-  if (view.steps.length === 0 && !(message.thinking && streaming)) {
-    return null
-  }
   // 未记录请求开关时，按是否有思考内容显示标题。
   const thinking = message.thinking ?? view.steps.some((step) => step.type === 'thinking')
+  const previewActive = Boolean(android && thinking && titleActive)
+  useTicker(titleActive, 1000)
+
+  useLayoutEffect(() => {
+    if (clipRef.current) {
+      clipRef.current.inert = !open
+    }
+  }, [open, view.steps.length])
+
+  useLayoutEffect(() => {
+    const preview = previewRef.current
+    const steps = stepsRef.current
+    if (!previewActive || !preview || !steps) {
+      setPreviewOverflow(false)
+      return
+    }
+    let frame = 0
+    let previousTime = 0
+    const follow = (time: number) => {
+      frame = 0
+      const target = preview.scrollHeight - preview.clientHeight
+      const remaining = target - preview.scrollTop
+      if (remaining <= 0.5) {
+        preview.scrollTop = target
+        previousTime = 0
+        return
+      }
+      const elapsed = previousTime ? Math.min(time - previousTime, 50) : 16
+      previousTime = time
+      preview.scrollTop += remaining * (1 - Math.exp(-elapsed / 70))
+      frame = requestAnimationFrame(follow)
+    }
+    const update = () => {
+      const overflow = steps.scrollHeight > ANDROID_THINKING_PREVIEW_HEIGHT
+      setPreviewOverflow(overflow)
+      if (overflow && !streamExpanded && !frame) {
+        frame = requestAnimationFrame(follow)
+      }
+    }
+    const observer = new ResizeObserver(update)
+    observer.observe(steps)
+    update()
+    return () => {
+      observer.disconnect()
+      cancelAnimationFrame(frame)
+    }
+  }, [previewActive, streamExpanded, view.steps.length])
+
+  useEffect(() => {
+    if (!previewActive) {
+      setStreamExpanded(false)
+    }
+  }, [previewActive])
+
+  useLayoutEffect(() => {
+    if (previewActive) {
+      setRetainPreview(previewOverflow && !streamExpanded)
+      return
+    }
+    if (!retainPreview) {
+      return
+    }
+    if (open) {
+      setRetainPreview(false)
+      return
+    }
+    const timer = setTimeout(() => setRetainPreview(false), 220)
+    return () => clearTimeout(timer)
+  }, [previewActive, previewOverflow, streamExpanded, open, retainPreview])
+
+  if (view.steps.length === 0 && (android || !(message.thinking && streaming))) {
+    return null
+  }
   const title = thinking ? getAreaTitle(view, streaming, Date.now(), hasResponse) : null
   const stopped = !streaming && !hasResponse
+  const compactPreview = (previewActive && !streamExpanded) || (!open && retainPreview)
+  const toggle = () => {
+    if (previewActive) {
+      if (previewOverflow) {
+        stopFollowing()
+        setStreamExpanded(!streamExpanded)
+      }
+    } else {
+      if (android && !open) {
+        stopFollowing()
+      }
+      setOverride(!open)
+    }
+  }
+  const steps = view.steps.map((step, index) => (
+    <StepItem
+      key={stepKey(step, index)}
+      step={step}
+      message={message}
+      sources={view.sources}
+      streaming={streaming}
+      isLast={index === view.steps.length - 1}
+    />
+  ))
   return (
-    <div className={styles.area}>
+    <div className={styles.area} data-expanded={android && title && open ? '' : undefined}>
       {title ? (
-        <div className={styles.title} onClick={() => setOverride(!open)}>
-          <span className={clsx(styles.titleIcon, stopped && styles.stoppedIcon)}>
-            <IconThinkOutline16 />
-          </span>
+        <div
+          className={styles.title}
+          role="button"
+          tabIndex={0}
+          aria-expanded={previewActive ? !previewOverflow || streamExpanded : open}
+          onClick={toggle}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              toggle()
+            }
+          }}
+        >
+          {!android ? (
+            <span className={clsx(styles.titleIcon, stopped && styles.stoppedIcon)}>
+              <IconThinkOutline16 />
+            </span>
+          ) : null}
           <span className={clsx(styles.titleText, titleActive && styles.shimmer)}>{title}</span>
-          {open ? <IconChevronDownOutline14 /> : <IconChevronRightOutline14 />}
+          {previewActive ? (
+            previewOverflow ? (
+              streamExpanded ? (
+                <span className={styles.androidChevron} data-open="true" aria-hidden="true">
+                  <IconChevronRightOutline14 />
+                </span>
+              ) : (
+                <span className={styles.previewIcon} aria-hidden="true">
+                  <IconChevronDownOutline14 />
+                  <IconChevronDownOutline14 />
+                </span>
+              )
+            ) : null
+          ) : android ? (
+            <span className={styles.androidChevron} data-open={open} aria-hidden="true">
+              <IconChevronRightOutline14 />
+            </span>
+          ) : open ? (
+            <IconChevronDownOutline14 />
+          ) : (
+            <IconChevronRightOutline14 />
+          )}
         </div>
       ) : null}
-      {open || !title ? (
-        <div className={styles.steps}>
-          {view.steps.map((step, index) => (
-            <StepItem
-              key={stepKey(step, index)}
-              step={step}
-              message={message}
-              sources={view.sources}
-              streaming={streaming}
-              isLast={index === view.steps.length - 1}
-            />
-          ))}
+      {android && title ? (
+        <div className={styles.disclosure} data-open={open} aria-hidden={!open}>
+          <div ref={clipRef} className={styles.disclosureClip}>
+            <div
+              ref={previewRef}
+              className={clsx(
+                styles.steps,
+                compactPreview && styles.preview,
+                compactPreview && (previewOverflow || retainPreview) && styles.previewFade
+              )}
+            >
+              <div ref={stepsRef}>{steps}</div>
+            </div>
+          </div>
         </div>
+      ) : open || !title ? (
+        <div className={styles.steps}>{steps}</div>
       ) : null}
     </div>
   )
