@@ -1,21 +1,34 @@
+<div align="center">
+
 # DeepSeek App Replica
 
-尽可能复刻 DeepSeek 官方手机端（Android）交互与视觉体验的客户端。
+尽可能复刻 DeepSeek 官方手机端（Android）交互与视觉体验的客户端
 
-与官方客户端的区别在于未接入官方账号体系，改为直接输入用户自己的 DeepSeek 开放平台 API Key。官方 App 通过账号登录受限于日常用量配额，而直接接入个人 API Key 采用按量计费（Pay-as-you-go），只要账户额度充裕即可自由使用不受限额打断；同时所有会话数据均保存在设备本地。
+[![Release](https://img.shields.io/github/v/release/LiJiaHua1024/deepseek-app-replica?style=flat-square&color=2563eb&label=Release)](https://github.com/LiJiaHua1024/deepseek-app-replica/releases/latest)
+[![Platform](https://img.shields.io/badge/Platform-Android%2012%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](https://github.com/LiJiaHua1024/deepseek-app-replica)
+[![License](https://img.shields.io/badge/License-GPL%20v3-blue?style=flat-square)](LICENSE)
+
+<br />
+
+[**📥 前往 Releases 下载 APK 安装包**](https://github.com/LiJiaHua1024/deepseek-app-replica/releases/latest) · [**反馈问题**](https://github.com/LiJiaHua1024/deepseek-app-replica/issues)
+
+</div>
 
 ---
 
-## 核心特性
+与官方客户端的区别在于未接入官方账号体系，改为直接输入用户自己的 DeepSeek 开放平台 API Key。官方 App 通过账号登录受限于日常用量配额，而直接接入个人 API Key 采用按量计费（Pay-as-you-go），只要账户额度充裕即可自由使用不受限额打断；同时所有会话数据均保存在设备本地。
 
-- **流式深度思考**：还原 DeepSeek-R1 思考链展示，支持折叠/展开动画、思考状态高亮扫光微动效与自动跟随滚动。
-- **联网搜索与引用溯源**：支持智能搜索模式，提供底部上拉式引用来源抽屉，点击来源可直接在内置独立浏览器中阅读网页原文。
-- **按住说话（Hold to Talk）**：还原长按录音交互面板与实时声波振幅动画，支持上滑取消与平滑色彩过渡。
-- **相册与多模态输入**：内置原生相册选取抽屉，支持相机拍照、相册多选、最近图片快速预取与微缩预览。
-- **原生沉浸与布局适配**：适配全面屏手势与系统安全区，软键盘弹起时输入框自适应对齐（`adjustResize`）。
-- **完善的内容排版**：内置完整 Markdown 解析引擎，支持 KaTeX 数学公式排版、代码语法高亮与一键复制、Mermaid 结构图表。
-- **深浅色主题自适应**：跟随系统自动切换深色/浅色模式，支持中英文双语界面。
-- **历史记录导入与导出**：支持将本地会话与图片打包为 ZIP 归档导出或恢复。
+## 下载与安装
+
+请前往 [GitHub Releases](https://github.com/LiJiaHua1024/deepseek-app-replica/releases) 页面获取最新发布的 APK 文件，安装至 Android 设备即可使用。
+
+> **系统要求**：Android 12（API 级别 32）或更高版本。
+
+## 使用步骤
+
+1. 安装并打开应用，点击左上角抽屉菜单进入「设置」。
+2. 在 API 配置中填入你在 DeepSeek 开放平台申请的 API Key。
+3. 返回主页面即可开始对话，支持深度思考、联网搜索、语音对讲与相册多模态等功能。
 
 ---
 
@@ -27,50 +40,27 @@
 - **Web 交互层**：React 18 + TypeScript + Zustand 状态管理，基于 CSS Modules 进行交互细节调优，引入 KaTeX、Mermaid 与 Prism.js 提供排版渲染。
 - **构建系统**：Rspack 2 高速打包，与 Gradle `buildWeb` 构建任务无缝联动。
 
----
+## 源码构建
 
-## 快速开始
+如果你希望自行从源码编译 APK：
 
-### 开发环境准备
-- **Node.js**：22.12 或更高版本
-- **pnpm**：包管理器
-- **JDK**：Java Development Kit 17 或更高版本
-- **Android SDK**：API Level 32 ~ 37
+### 环境要求
+- Node.js 22.12+ 与 pnpm
+- JDK 17+
+- Android SDK（API Level 32 ~ 37）
 
-### 1. 克隆代码与安装依赖
-```sh
-git clone https://github.com/lijiahua1024/DeepSeek-App-Replica.git
-cd DeepSeek-App-Replica
-pnpm install
-```
-
-### 2. 构建 Android APK
-在项目根目录下执行 Gradle 构建脚本（构建过程会自动运行 `pnpm build` 打包前端资源至 Android assets）：
-
+### 构建步骤
 ```powershell
+# 1. 克隆代码并安装前端依赖
+git clone https://github.com/LiJiaHua1024/deepseek-app-replica.git
+cd deepseek-app-replica
+pnpm install
+
+# 2. 编译生成 Android Debug APK（会自动触发前端构建打包）
 .\android\gradlew.bat -p android :app:assembleDebug
 ```
 
-构建完成后，生成的调试安装包位于：
-```text
-android/app/build/outputs/apk/debug/app-debug.apk
-```
-
-### 3. 本地独立调试（可选）
-如果仅需调试界面布局与交互逻辑，可启动本地开发服务器：
-
-```sh
-pnpm dev
-```
-启动后在浏览器中打开 `http://localhost:8090` 即可预览。
-
----
-
-## 使用说明
-
-1. 首次打开应用后，点击左上角抽屉菜单进入「设置」。
-2. 在 API 配置中填入在 DeepSeek 开放平台申请的 API Key。
-3. 返回聊天界面，即可体验完整的多轮对话、深度思考、联网搜索与多模态能力。
+编译输出路径：`android/app/build/outputs/apk/debug/app-debug.apk`
 
 ---
 
