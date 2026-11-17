@@ -32,6 +32,7 @@ export const App = () => {
   const t = useTranslate()
   const isMobile = useIsMobile()
   const apiKey = useSettings((state) => state.apiKey)
+  const drawerOpen = useMobileSider((state) => state.open)
   const locale = useSettings((state) => state.locale)
   // 移动端侧边栏以独立抽屉管理开合状态
   const siderCollapsed = useSettings((state) => state.siderCollapsed) && !isMobile
@@ -104,7 +105,7 @@ export const App = () => {
 
   return (
     <>
-      <div ref={frameRef} className={styles.frame}>
+      <div ref={frameRef} className={styles.frame} data-drawer-open={drawerOpen}>
         {isMobile ? <MobileSider /> : siderCollapsed ? null : <Sider />}
         <main className={styles.main}>
           {saveError ? (

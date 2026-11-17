@@ -3,6 +3,7 @@ import type { TranslationMessage } from '../../i18n/index.js'
 import { transcribe } from '../../services/api/speech.js'
 import { startRecording, type Recording } from '../../services/speech/recorder.js'
 import { useSettings } from '../../services/settings.js'
+import { android } from '../../app/android.js'
 import { showToast } from '../base/toastState.js'
 
 export type VoiceInputStatus = 'idle' | 'recording' | 'transcribing'
@@ -16,7 +17,7 @@ const AVAILABLE = typeof window === 'undefined' || window.isSecureContext
 const describeRecordingError = (error: unknown): TranslationMessage => {
   if (error instanceof DOMException) {
     if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
-      return { key: 'voiceInputPermissionDenied' }
+      return { key: android ? 'androidMicPermissionDenied' : 'voiceInputPermissionDenied' }
     }
     if (error.name === 'NotFoundError') {
       return { key: 'voiceInputNoDevice' }
@@ -96,16 +97,11 @@ export const useVoiceInput = (onText: (text: string) => void) => {
     }
   }, [cancel])
 
-  const toggle = useCallback(async () => {
+  const start = useCallback(async () => {
     if (!AVAILABLE) {
       return
     }
-    if (status === 'recording') {
-      await finish()
-      return
-    }
-    if (status === 'transcribing') {
-      cancel()
+    if (status !== 'idle') {
       return
     }
     const operation = ++operationRef.current
@@ -128,7 +124,17 @@ export const useVoiceInput = (onText: (text: string) => void) => {
         showToast(describeRecordingError(error))
       }
     }
-  }, [status, finish, cancel])
+  }, [status, finish])
+
+  const toggle = async () => {
+    if (status === 'recording') {
+      await finish()
+    } else if (status === 'transcribing') {
+      cancel()
+    } else {
+      await start()
+    }
+  }
 
   useEffect(() => {
     if (status !== 'recording') {
@@ -144,9 +150,27 @@ export const useVoiceInput = (onText: (text: string) => void) => {
   }, [status])
 
   useEffect(() => cancelOperation, [cancelOperation])
+  useEffect(() => {
+    if (!android) {
+      return
+    }
+    window.addEventListener('android-recording-interrupted', cancel)
+    return () => window.removeEventListener('android-recording-interrupted', cancel)
+  }, [cancel])
 
   /** 当前录音的频谱分析节点，未录音时为 null */
   const getAnalyser = useCallback(() => recordingRef.current?.analyser ?? null, [])
+  const getLevel = useCallback(() => recordingRef.current?.level?.() ?? 0, [])
 
-  return { status, seconds, getAnalyser, toggle, cancel, available: AVAILABLE }
+  return {
+    status,
+    seconds,
+    getAnalyser,
+    getLevel,
+    start,
+    finish,
+    toggle,
+    cancel,
+    available: AVAILABLE,
+  }
 }

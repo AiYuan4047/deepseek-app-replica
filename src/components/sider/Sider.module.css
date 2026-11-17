@@ -245,3 +245,62 @@
     line-height: 22px;
   }
 }
+
+[data-android] .drawer {
+  z-index: 1;
+}
+
+[data-android] .drawerMask {
+  left: var(--drawer-edge);
+}
+
+[data-android] .mobile {
+  width: var(--drawer-edge);
+  max-width: none;
+  padding: 12px 24px 16px 16px;
+  border: 0;
+  background: var(--dsw-alias-bg-base);
+
+  .listWrap {
+    margin-top: 16px;
+  }
+
+  .bottom {
+    padding: 8px 0 0;
+  }
+
+  .settings {
+    padding: 4px 0;
+  }
+
+  .settingsIcon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--dsw-alias-bg-skeleton);
+  }
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+  height: 48px;
+  padding: 0 14px;
+  border-radius: 24px;
+  color: var(--dsw-alias-label-tertiary);
+  background: var(--dsw-alias-bg-skeleton);
+
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    outline: none;
+    color: var(--dsw-alias-label-primary);
+    background: transparent;
+    font: inherit;
+    font-size: 16px;
+  }
+}

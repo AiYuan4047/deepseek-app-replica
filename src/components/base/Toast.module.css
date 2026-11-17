@@ -25,6 +25,15 @@
   pointer-events: none;
 }
 
+[data-android] .toast {
+  top: 50%;
+  translate: 0 -50%;
+  border: 0;
+  border-radius: 16px;
+  background: rgb(32 32 32 / 86%);
+  box-shadow: none;
+}
+
 /* 带图标时图标在左、文字左对齐，整体仍居中 */
 .error {
   display: flex;

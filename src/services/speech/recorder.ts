@@ -1,3 +1,5 @@
+import { android } from '../../app/android.js'
+
 /**
  * 录音并编码为 ASR 接受的 WAV（单声道、16-bit PCM、16kHz）。
  *
@@ -16,11 +18,60 @@ export type Recording = {
   /** 放弃录音，释放麦克风 */
   cancel: () => void
   /** 频谱分析节点，只读；采样率与录音一致 */
-  analyser: AnalyserNode
+  analyser?: AnalyserNode
+  level?: () => number
+}
+
+const startAndroidRecording = async (
+  device: NonNullable<typeof android>,
+  onLimit: () => void
+): Promise<Recording> => {
+  const state = await new Promise<string>((resolve) => {
+    window.addEventListener(
+      'android-recording',
+      (event) => {
+        resolve((event as CustomEvent<string>).detail)
+      },
+      { once: true }
+    )
+    device.requestRecording()
+  })
+  if (state !== 'ready') {
+    throw new DOMException(
+      'Android microphone unavailable',
+      state === 'denied' ? 'NotAllowedError' : 'NotReadableError'
+    )
+  }
+  let finished = false
+  const timer = setTimeout(onLimit, MAX_SECONDS * 1000)
+  const close = (keep: boolean) => {
+    if (finished) {
+      return false
+    }
+    finished = true
+    clearTimeout(timer)
+    return device.finishRecording(keep)
+  }
+  return {
+    stop: async () => {
+      if (!close(true)) {
+        return null
+      }
+      const response = await fetch('/recording.wav', { cache: 'no-store' })
+      return response.ok ? response.blob() : null
+    },
+    cancel: () => {
+      close(false)
+    },
+    level: () => device.recordingLevel(),
+  }
 }
 
 /** 开始录音；到达时长上限时调用 onLimit，由调用方决定何时 stop */
 export const startRecording = async (onLimit: () => void): Promise<Recording> => {
+  if (android) {
+    return startAndroidRecording(android, onLimit)
+  }
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
   })

@@ -1,7 +1,13 @@
 import clsx from 'clsx'
 import { useEffect, useMemo, useState } from 'react'
+import { android } from '../../app/android.js'
 import { useTranslate } from '../../i18n/index.js'
-import { IconPanelLeftOutline16, IconSettingsOutline16, NewChatIcon } from '../base/icons.js'
+import {
+  IconPanelLeftOutline16,
+  IconSearchOutline16,
+  IconSettingsOutline16,
+  NewChatIcon,
+} from '../base/icons.js'
 import { setSiderCollapsed } from '../../services/settings.js'
 import { groupSessions } from '../../services/chat/sessionGroups.js'
 import { newChat, removeSession, useChatStore } from '../../services/chat/store.js'
@@ -13,6 +19,7 @@ import { showToast } from '../base/toastState.js'
 import { openSettings } from '../settings/settingsDialogState.js'
 import { closeMobileSider, useMobileSider } from './mobileSiderState.js'
 import { SessionItem } from './SessionItem.js'
+import { useSessionSearch } from './useSessionSearch.js'
 import styles from './Sider.module.css'
 
 /** 展开的侧边栏：名称与收起按钮、开启新对话、按时间分组的会话列表、底部设置；移动端放在抽屉里，收起按钮关闭抽屉 */
@@ -20,8 +27,11 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   const t = useTranslate()
   const sessions = useChatStore((state) => state.sessions)
   const activeId = useChatStore((state) => state.activeId)
+  const androidDrawer = Boolean(mobile && android)
+  const [query, setQuery] = useState('')
+  const matches = useSessionSearch(query, sessions)
   const [now, setNow] = useState(Date.now)
-  const groups = useMemo(() => groupSessions(sessions, now, t), [sessions, now, t])
+  const groups = useMemo(() => groupSessions(matches, now, t), [matches, now, t])
   const [deleting, setDeleting] = useState<SessionSummary | null>(null)
   const [deletePending, setDeletePending] = useState(false)
 
@@ -51,29 +61,44 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
 
   return (
     <div className={clsx(styles.sider, mobile && styles.mobile)}>
-      <div className={styles.top}>
-        <div className={styles.appName}>{t('appName')}</div>
-        <IconButton
-          size="m"
-          icon={<IconPanelLeftOutline16 />}
-          tooltip={t('collapseSiderbarButton')}
-          tooltipPlacement="bottom"
-          onClick={() => (mobile ? closeMobileSider() : setSiderCollapsed(true))}
-        />
-      </div>
-      <button
-        type="button"
-        className={styles.newChat}
-        onClick={() => {
-          newChat()
-          closeMobileSider()
-        }}
-      >
-        <span className={styles.newChatIcon}>
-          <NewChatIcon />
-        </span>
-        {t('newChat')}
-      </button>
+      {androidDrawer ? (
+        <label className={styles.search}>
+          <IconSearchOutline16 />
+          <input
+            type="search"
+            placeholder={t('androidSearchChats')}
+            aria-label={t('androidSearchChats')}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+      ) : (
+        <>
+          <div className={styles.top}>
+            <div className={styles.appName}>{t('appName')}</div>
+            <IconButton
+              size="m"
+              icon={<IconPanelLeftOutline16 />}
+              tooltip={t('collapseSiderbarButton')}
+              tooltipPlacement="bottom"
+              onClick={() => (mobile ? closeMobileSider() : setSiderCollapsed(true))}
+            />
+          </div>
+          <button
+            type="button"
+            className={styles.newChat}
+            onClick={() => {
+              newChat()
+              closeMobileSider()
+            }}
+          >
+            <span className={styles.newChatIcon}>
+              <NewChatIcon />
+            </span>
+            {t('newChat')}
+          </button>
+        </>
+      )}
       <div className={styles.listWrap}>
         <div className={styles.list}>
           {groups.map((group) => (

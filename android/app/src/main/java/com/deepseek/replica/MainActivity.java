@@ -3,6 +3,7 @@ package com.deepseek.replica;
 import android.Manifest;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
+import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -10,12 +11,13 @@ import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Insets;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.webkit.JavascriptInterface;
 import android.webkit.MimeTypeMap;
-import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -35,16 +37,27 @@ public final class MainActivity extends Activity {
     private static final String HOME = "https://" + ASSET_HOST + "/index.html";
     private static final int MICROPHONE = 1;
     private static final int FILE_CHOOSER = 2;
+    private static final int PHOTOS = 3;
+    private static final int CAMERA = 4;
+    private static final int EXPORT_HISTORY = 5;
     private WebView webView;
     private FrameLayout frame;
     private ApiKeyStore keys;
-    private PermissionRequest microphoneRequest;
     private ValueCallback<Uri[]> fileCallback;
+    private boolean keyboardVisible;
+    private boolean askedForPhotos;
+    private Uri capture;
+    private RecentPhotos recentPhotos;
+    private HistoryExport historyExport;
+    private NativeRecorder recorder;
 
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
         keys = new ApiKeyStore(this);
+        recentPhotos = new RecentPhotos(getContentResolver());
+        historyExport = new HistoryExport(getContentResolver());
+        recorder = new NativeRecorder();
         frame = new FrameLayout(this);
         webView = new WebView(this);
         frame.addView(webView, new FrameLayout.LayoutParams(-1, -1));
@@ -52,6 +65,12 @@ public final class MainActivity extends Activity {
             Insets safe = insets.getInsets(WindowInsets.Type.systemBars()
                 | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
             view.setPadding(safe.left, safe.top, safe.right, safe.bottom);
+            boolean ime = insets.isVisible(WindowInsets.Type.ime());
+            if (ime != keyboardVisible) {
+                keyboardVisible = ime;
+                webView.evaluateJavascript("document.documentElement?.toggleAttribute("
+                    + "'data-keyboard', " + ime + ")", null);
+            }
             return WindowInsets.CONSUMED;
         });
         setContentView(frame);
@@ -82,7 +101,7 @@ public final class MainActivity extends Activity {
             | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
         getWindow().getInsetsController().setSystemBarsAppearance(dark ? 0 : flags, flags);
         getWindow().setNavigationBarContrastEnforced(false);
-        int color = Color.parseColor(dark ? "#191919" : "#FDFDFD");
+        int color = Color.parseColor(dark ? "#191919" : "#FFFFFF");
         frame.setBackgroundColor(color);
         webView.setBackgroundColor(color);
     }
@@ -95,7 +114,9 @@ public final class MainActivity extends Activity {
     private final class AppPage extends WebViewClient {
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-            if (isBundled(request.getUrl())) return false;
+            if (isBundled(request.getUrl())) {
+                return !request.isForMainFrame() || !"/index.html".equals(request.getUrl().getPath());
+            }
             String scheme = request.getUrl().getScheme();
             if (request.isForMainFrame() && ("https".equals(scheme) || "http".equals(scheme))) {
                 try {
@@ -112,6 +133,15 @@ public final class MainActivity extends Activity {
             Uri url = request.getUrl();
             if (!isBundled(url)) return null;
             String path = url.getPath();
+            if ("/recording.wav".equals(path)) {
+                WebResourceResponse audio = recorder.takeWav();
+                if (audio != null) return audio;
+            }
+            if (path != null && path.matches("/(recent|thumbnail)/[0-9]+")) {
+                WebResourceResponse photo = recentPhotos.open(url.getLastPathSegment(),
+                    path.startsWith("/thumbnail/"));
+                if (photo != null) return photo;
+            }
             if ("/index.html".equals(path) || (path != null && path.startsWith("/static/")
                     && !path.contains("/../"))) {
                 String name = path.substring(1);
@@ -121,7 +151,7 @@ public final class MainActivity extends Activity {
                 Map<String, String> headers = Map.of("Content-Security-Policy",
                     "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
                     + "img-src 'self' https: data: blob:; font-src 'self' data:; "
-                    + "media-src 'self' blob:; connect-src https://api.deepseek.com; "
+                    + "media-src 'self' blob:; connect-src 'self' https://api.deepseek.com; "
                     + "frame-src 'none'; base-uri 'none'; form-action 'none';");
                 try {
                     return new WebResourceResponse(type == null ? "application/octet-stream" : type,
@@ -137,31 +167,18 @@ public final class MainActivity extends Activity {
 
     private final class DeviceFeatures extends WebChromeClient {
         @Override
-        public void onPermissionRequest(PermissionRequest request) {
-            String[] audio = {PermissionRequest.RESOURCE_AUDIO_CAPTURE};
-            if (!isBundled(request.getOrigin()) || !Arrays.equals(request.getResources(), audio)) {
-                request.deny();
-            } else if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
-                    == PackageManager.PERMISSION_GRANTED) {
-                request.grant(audio);
-            } else if (microphoneRequest != null) {
-                request.deny();
-            } else {
-                microphoneRequest = request;
-                requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MICROPHONE);
-            }
-        }
-
-        @Override
-        public void onPermissionRequestCanceled(PermissionRequest request) {
-            if (microphoneRequest == request) microphoneRequest = null;
-        }
-
-        @Override
         public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback,
                                          FileChooserParams params) {
             if (fileCallback != null) fileCallback.onReceiveValue(null);
             fileCallback = callback;
+            if (params.isCaptureEnabled()) {
+                if (granted(Manifest.permission.CAMERA)) {
+                    launchCamera();
+                } else {
+                    requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA);
+                }
+                return true;
+            }
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
                 .setType("*/*")
                 .putExtra(Intent.EXTRA_ALLOW_MULTIPLE,
@@ -172,6 +189,18 @@ public final class MainActivity extends Activity {
                 .filter(type -> type != null && type.contains("/"))
                 .distinct().toArray(String[]::new);
             if (mimeTypes.length > 0) intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+            if (Build.VERSION.SDK_INT >= 33 && Arrays.equals(mimeTypes, new String[]{"image/*"})) {
+                Intent picker = new Intent(MediaStore.ACTION_PICK_IMAGES).setType("image/*");
+                if (params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE) {
+                    picker.putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX, 10);
+                }
+                try {
+                    startActivityForResult(picker, FILE_CHOOSER);
+                    return true;
+                } catch (ActivityNotFoundException ignored) {
+                    // Use the document picker on devices without the system photo picker.
+                }
+            }
             try {
                 startActivityForResult(intent, FILE_CHOOSER);
             } catch (ActivityNotFoundException ignored) {
@@ -182,16 +211,63 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private boolean granted(String permission) {
+        return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void showRecentPhotos() {
+        String imagesPermission = Build.VERSION.SDK_INT >= 33 ? Manifest.permission.READ_MEDIA_IMAGES
+            : Manifest.permission.READ_EXTERNAL_STORAGE;
+        boolean partial = Build.VERSION.SDK_INT >= 34
+            && granted(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED);
+        if (!partial && !granted(imagesPermission) && !askedForPhotos) {
+            askedForPhotos = true;
+            String[] permissions = Build.VERSION.SDK_INT >= 34
+                ? new String[]{imagesPermission, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED}
+                : new String[]{imagesPermission};
+            requestPermissions(permissions, PHOTOS);
+        } else {
+            notifyRecentPhotos();
+        }
+    }
+
+    private void notifyRecentPhotos() {
+        webView.evaluateJavascript("window.dispatchEvent(new Event('android-photos'))", null);
+    }
+
+    private void launchCamera() {
+        try {
+            capture = CaptureProvider.create(this);
+            Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+                .putExtra(MediaStore.EXTRA_OUTPUT, capture)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            camera.setClipData(ClipData.newRawUri("photo", capture));
+            startActivityForResult(camera, FILE_CHOOSER);
+        } catch (IOException | ActivityNotFoundException ignored) {
+            capture = null;
+            completeFileChooser(null);
+        }
+    }
+
+    private void completeFileChooser(Uri[] files) {
+        if (fileCallback == null) return;
+        ValueCallback<Uri[]> callback = fileCallback;
+        fileCallback = null;
+        callback.onReceiveValue(files);
+    }
+
     @Override
     public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
-        if (code == MICROPHONE && microphoneRequest != null) {
-            PermissionRequest request = microphoneRequest;
-            microphoneRequest = null;
-            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
-                request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+        if (code == MICROPHONE) {
+            startRecording();
+        } else if (code == PHOTOS) {
+            notifyRecentPhotos();
+        } else if (code == CAMERA && fileCallback != null) {
+            if (granted(Manifest.permission.CAMERA)) {
+                launchCamera();
             } else {
-                request.deny();
+                completeFileChooser(null);
             }
         }
     }
@@ -199,20 +275,56 @@ public final class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int code, int result, Intent data) {
         super.onActivityResult(code, result, data);
-        if (code == FILE_CHOOSER && fileCallback != null) {
-            ValueCallback<Uri[]> callback = fileCallback;
-            fileCallback = null;
-            callback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, data));
+        if (code == EXPORT_HISTORY) {
+            Uri uri = result == RESULT_OK && data != null ? data.getData() : null;
+            reportExport(uri == null ? "cancelled" : historyExport.open(uri) ? "ready" : "error");
+        } else if (code == FILE_CHOOSER && fileCallback != null) {
+            Uri[] files = null;
+            if (result == RESULT_OK) {
+                if (capture != null) {
+                    files = new Uri[]{capture};
+                } else if (data != null && data.getClipData() != null) {
+                    ClipData clip = data.getClipData();
+                    files = new Uri[clip.getItemCount()];
+                    for (int index = 0; index < files.length; index++) {
+                        files[index] = clip.getItemAt(index).getUri();
+                    }
+                } else if (data != null && data.getData() != null) {
+                    files = new Uri[]{data.getData()};
+                }
+            }
+            capture = null;
+            completeFileChooser(files);
         }
     }
 
     @Override
+    protected void onStop() {
+        recorder.finish(false);
+        webView.evaluateJavascript("window.dispatchEvent(new Event('android-recording-interrupted'))", null);
+        super.onStop();
+    }
+
+    @Override
     protected void onDestroy() {
-        if (microphoneRequest != null) microphoneRequest.deny();
         if (fileCallback != null) fileCallback.onReceiveValue(null);
+        recorder.finish(false);
+        historyExport.close();
         frame.removeView(webView);
         webView.destroy();
         super.onDestroy();
+    }
+
+    private void reportExport(String state) {
+        webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('android-export', "
+            + "{detail: '" + state + "'}))", null);
+    }
+
+    private void startRecording() {
+        String state = !granted(Manifest.permission.RECORD_AUDIO) ? "denied"
+            : recorder.start() ? "ready" : "error";
+        webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('android-recording', "
+            + "{detail: '" + state + "'}))", null);
     }
 
     private final class DeviceBridge {
@@ -224,5 +336,49 @@ public final class MainActivity extends Activity {
 
         @JavascriptInterface
         public void setDarkBars(boolean dark) { runOnUiThread(() -> setBars(dark)); }
+
+        @JavascriptInterface
+        public void requestRecentPhotos() { runOnUiThread(() -> showRecentPhotos()); }
+
+        @JavascriptInterface
+        public String readRecentPhotos() { return recentPhotos.list(); }
+
+        @JavascriptInterface
+        public void requestHistoryExport(String fileName) {
+            runOnUiThread(() -> {
+                Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
+                    .addCategory(Intent.CATEGORY_OPENABLE)
+                    .setType("application/zip")
+                    .putExtra(Intent.EXTRA_TITLE, fileName);
+                try {
+                    startActivityForResult(intent, EXPORT_HISTORY);
+                } catch (ActivityNotFoundException ignored) {
+                    reportExport("error");
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public boolean writeHistoryExport(String bytes) { return historyExport.append(bytes); }
+
+        @JavascriptInterface
+        public boolean finishHistoryExport() { return historyExport.close(); }
+
+        @JavascriptInterface
+        public void requestRecording() {
+            runOnUiThread(() -> {
+                if (granted(Manifest.permission.RECORD_AUDIO)) {
+                    startRecording();
+                } else {
+                    requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MICROPHONE);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public boolean finishRecording(boolean keep) { return recorder.finish(keep); }
+
+        @JavascriptInterface
+        public double recordingLevel() { return recorder.level(); }
     }
 }

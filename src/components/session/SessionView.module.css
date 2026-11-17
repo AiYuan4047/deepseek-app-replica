@@ -59,6 +59,11 @@
   user-select: none;
 }
 
+[data-android] .inputContainer {
+  max-width: calc(100% - 24px);
+  padding-bottom: var(--android-composer-bottom);
+}
+
 @media not all and (min-width: 768px) {
   .inputContainer {
     position: relative;

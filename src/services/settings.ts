@@ -15,6 +15,7 @@ type Settings = {
   themePreference: ThemePreference
   location: UserLocation | null
   ttsVoice: TtsVoice
+  autoRead: boolean
   thinking: boolean
   search: boolean
   siderCollapsed: boolean
@@ -26,6 +27,7 @@ const KEYS = {
   location: 'chat-demo:location',
   themePreference: 'chat-demo:theme-preference',
   ttsVoice: 'chat-demo:tts-voice',
+  autoRead: 'replica:auto-read',
   thinking: 'chat-demo:thinking',
   search: 'chat-demo:search',
   siderCollapsed: 'chat-demo:sider-collapsed',
@@ -94,6 +96,7 @@ export const useSettings = create<Settings>(() => ({
   location: initialLocation(),
   themePreference: initialThemePreference(),
   ttsVoice: initialTtsVoice(),
+  autoRead: read(KEYS.autoRead) === 'true',
   thinking: read(KEYS.thinking) === 'true',
   search: (read(KEYS.search) ?? (android ? 'true' : 'false')) === 'true',
   siderCollapsed: read(KEYS.siderCollapsed) === 'true',
@@ -118,6 +121,11 @@ export const setThemePreference = (themePreference: ThemePreference) => {
 export const setTtsVoice = (ttsVoice: TtsVoice) => {
   write(KEYS.ttsVoice, ttsVoice)
   useSettings.setState({ ttsVoice })
+}
+
+export const setAutoRead = (autoRead: boolean) => {
+  write(KEYS.autoRead, String(autoRead))
+  useSettings.setState({ autoRead })
 }
 
 export const setApiKey = (apiKey: string | null) => {

@@ -1,6 +1,21 @@
 import type { zh } from './zh.js'
 
 export const en = {
+  androidWelcome: 'Hi, what can I help you with?',
+  androidMessageHint: 'Send a message',
+  androidHoldHint: 'Send a message or hold to talk',
+  androidHoldToTalk: 'Hold to talk',
+  androidSlideToCancel: 'Release to send, swipe up to cancel',
+  androidReleaseToCancel: 'Release to cancel',
+  androidTextMode: 'Switch to keyboard',
+  androidMicPermissionDenied: 'Allow microphone access in your phone settings.',
+  androidAutoRead: 'Read replies aloud automatically',
+  androidAutoReadEnabled: 'Automatic read aloud on',
+  androidAutoReadDisabled: 'Automatic read aloud off',
+  androidCamera: 'Camera',
+  androidGallery: 'Photos',
+  androidFiles: 'Files',
+  androidSearchChats: 'Search chats...',
   welcomeMessageChat250808: 'How can I help you?',
   contentCaveat: 'AI-generated, for reference only',
   expandSiderbarButton: 'Open sidebar',

@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import { android, saveAndroidHistory } from '../../app/android.js'
 import { useRef, useState, type ReactNode } from 'react'
 import {
   IconDarkOutline16,
@@ -524,6 +525,10 @@ const ExportHistory = ({ disabled }: { disabled: boolean }) => {
     setStatus(null)
     try {
       const { name, blob } = await exportHistory()
+      if (android) {
+        await saveAndroidHistory(name, blob)
+        return
+      }
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url

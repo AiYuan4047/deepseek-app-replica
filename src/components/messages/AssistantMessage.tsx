@@ -1,11 +1,18 @@
 import { useTranslate } from '../../i18n/index.js'
 import clsx from 'clsx'
-import { memo } from 'react'
+import { memo, useEffect, useRef } from 'react'
+import { android } from '../../app/android.js'
 import { IconRefreshOutline16, IconWarningOutline16 } from '../base/icons.js'
 import { describeReply } from '../../services/chat/describe.js'
 import { canContinueReply } from '../../services/chat/reply.js'
 import { continueReply, regenerateReply } from '../../services/chat/store.js'
-import { stopReadAloud } from '../../services/speech/readAloud.js'
+import {
+  describeReadAloudError,
+  stopReadAloud,
+  toggleReadAloud,
+} from '../../services/speech/readAloud.js'
+import { useSettings } from '../../services/settings.js'
+import { showToast } from '../base/toastState.js'
 import type { AssistantMessage as AssistantMessageType } from '../../services/chat/types.js'
 import { openSettings } from '../settings/settingsDialogState.js'
 import { IconButton } from '../base/IconButton.js'
@@ -54,6 +61,21 @@ export const AssistantMessage = memo(function AssistantMessage({
     .filter(Boolean)
     .join('\n\n')
   const copyText = responseText || notice?.text
+  const wasStreaming = useRef(streaming)
+  useEffect(() => {
+    if (
+      android &&
+      wasStreaming.current &&
+      !streaming &&
+      isLast &&
+      responseText &&
+      message.stopReason === 'end_turn' &&
+      useSettings.getState().autoRead
+    ) {
+      toggleReadAloud(message.id, responseText, (error) => showToast(describeReadAloudError(error)))
+    }
+    wasStreaming.current = streaming
+  }, [isLast, message.id, message.stopReason, responseText, streaming])
   const waiting = streaming && view.steps.length === 0 && !view.answer && !message.thinking
   const summaryEntry = `${message.id}-summary`
   return (

@@ -21,7 +21,13 @@ const TILT_DB_PER_OCTAVE = 4
  * 录音中的实时频谱：从左到右依次是低频到高频，按对数分段。
  * 每帧直接改 transform，不触发 React 渲染。
  */
-export const Spectrum = ({ getAnalyser }: { getAnalyser: () => AnalyserNode | null }) => {
+export const Spectrum = ({
+  getAnalyser,
+  getLevel,
+}: {
+  getAnalyser: () => AnalyserNode | null
+  getLevel?: () => number
+}) => {
   const rootRef = useRef<HTMLDivElement>(null)
   const [count, setCount] = useState(0)
 
@@ -59,6 +65,7 @@ export const Spectrum = ({ getAnalyser }: { getAnalyser: () => AnalyserNode | nu
     const draw = () => {
       frame = requestAnimationFrame(draw)
       const analyser = getAnalyser()
+      const level = getLevel?.() ?? 0
       if (analyser) {
         if (data.length !== analyser.frequencyBinCount) {
           data = new Float32Array(analyser.frequencyBinCount)
@@ -71,7 +78,7 @@ export const Spectrum = ({ getAnalyser }: { getAnalyser: () => AnalyserNode | nu
         analyser.getFloatFrequencyData(data)
       }
       for (let index = 0; index < count; index += 1) {
-        let target = 0
+        let target = level * (0.25 + 0.75 * Math.sin((Math.PI * index) / count))
         if (analyser) {
           const { from, to, center } = ranges[index]
           let peak = -Infinity
@@ -104,7 +111,7 @@ export const Spectrum = ({ getAnalyser }: { getAnalyser: () => AnalyserNode | nu
 
     frame = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(frame)
-  }, [count, getAnalyser])
+  }, [count, getAnalyser, getLevel])
 
   return (
     <div ref={rootRef} className={styles.spectrum} aria-hidden>

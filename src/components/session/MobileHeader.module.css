@@ -17,3 +17,27 @@
   font: var(--dsw-font-s-strong-14);
   color: var(--dsw-alias-label-primary);
 }
+
+[data-android] .header {
+  height: 52px;
+  padding: 0 2px 0 4px;
+}
+
+[data-android] .menu svg {
+  width: 24px;
+  height: 24px;
+  transform: translateY(0.5px);
+}
+
+[data-android] .sound {
+  margin-right: 8px;
+
+  svg {
+    transform: translateX(-0.5px);
+  }
+}
+
+[data-android] .newChat svg {
+  width: 22px;
+  height: 22px;
+}
