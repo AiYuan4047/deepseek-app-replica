@@ -13,6 +13,14 @@ pnpm install --frozen-lockfile
 
 界面参考设备为小米 10（1080×2340，440 dpi），参考应用为 DeepSeek 2.8.0（298）。鲸鱼图标来自 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/web/public/favicon.svg)。
 
+安装 FFmpeg 后可以用下列命令比较同一台设备的无损 PNG。裁剪是 `x,y,宽,高`，单位为物理像素。示例裁掉状态栏时钟和系统图标。
+
+```powershell
+node scripts/compare-pixels.mjs captures/official/home.png captures/replica/home.png --crop 0,90,1080,2250
+```
+
+对于录屏，可用 `--frames 参考帧,复刻帧` 选取两边从零起算的解码帧。Android 的 MP4 录屏存在有损编码和可变间隔，可用于比较动画轨迹与时间。静态画面是否逐像素一致，以 `adb exec-out screencap -p` 输出的 PNG 为准。脚本返回 0 表示匹配，1 表示存在像素差异，2 表示输入或解码错误。
+
 [English](README.md) | 简体中文
 
 基于 DeepSeek API 的静态聊天示例。无需应用后端，浏览器直接请求配置的 API 服务。
