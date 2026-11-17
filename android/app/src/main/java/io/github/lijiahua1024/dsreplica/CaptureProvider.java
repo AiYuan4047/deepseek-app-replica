@@ -1,4 +1,4 @@
-package com.deepseek.replica;
+package io.github.lijiahua1024.dsreplica;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;

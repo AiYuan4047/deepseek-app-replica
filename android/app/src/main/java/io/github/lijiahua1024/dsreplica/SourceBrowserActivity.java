@@ -1,4 +1,4 @@
-package com.deepseek.replica;
+package io.github.lijiahua1024.dsreplica;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;

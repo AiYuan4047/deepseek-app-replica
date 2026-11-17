@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = 'com.deepseek.replica'
+    namespace = 'io.github.lijiahua1024.dsreplica'
     compileSdk = 37
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -11,7 +11,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = 'com.deepseek.replica'
+        applicationId = 'io.github.lijiahua1024.dsreplica'
         minSdk = 32
         targetSdk = 36
         versionCode = 1
