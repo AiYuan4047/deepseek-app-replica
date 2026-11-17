@@ -250,6 +250,7 @@
   z-index: 0;
   width: var(--drawer-edge);
   padding-top: var(--android-status-inset, 0px);
+  background: var(--dsw-alias-bg-base);
   transform: translateX(calc((var(--drawer-progress) - 1) * 100%));
   transition: transform var(--drawer-transition);
   box-sizing: border-box;
@@ -259,6 +260,7 @@
   content: '';
   position: absolute;
   inset: 0;
+  z-index: 30;
   background: #000;
   opacity: calc(0.207 * (1 - var(--drawer-progress)));
   pointer-events: none;

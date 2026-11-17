@@ -27,6 +27,16 @@
   touch-action: pan-y;
 }
 
+[data-android] .frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: calc(0.207 * (1 - var(--drawer-progress)));
+  transition: opacity var(--drawer-transition);
+  pointer-events: none;
+}
+
 [data-android] .frame[data-drawer-open='true'] {
   --drawer-progress: 1;
 }

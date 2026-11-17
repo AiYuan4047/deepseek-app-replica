@@ -29,6 +29,10 @@
   }
 }
 
+[data-android] .scroll {
+  touch-action: pan-y;
+}
+
 .column {
   width: calc(var(--message-list-max-width) - 2 * var(--message-list-padding-horizontal));
   max-width: calc(100% - 40px);
