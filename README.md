@@ -1,75 +1,100 @@
-# chat-demo
+# DeepSeek App Replica
 
-English | [简体中文](README.zh-CN.md)
+尽可能复刻 DeepSeek 官方手机端（Android）交互与视觉体验的客户端。
 
-A static chat demo powered by the DeepSeek API. No application backend is required: the browser connects directly to the configured API service.
+与官方客户端的区别在于未接入官方账号体系，改为直接输入用户自己的 DeepSeek 开放平台 API Key。官方 App 通过账号登录受限于日常用量配额，而直接接入个人 API Key 采用按量计费（Pay-as-you-go），只要账户额度充裕即可自由使用不受限额打断；同时所有会话数据均保存在设备本地。
 
-You can [try the app online](https://deepseek-ai.github.io/chat-demo/) or download the archive from [Releases](https://github.com/deepseek-ai/deepseek-chat-demo/releases), extract it, and double-click `index.html` to use it locally without installation or a build. Enter your API key in Settings before your first chat.
+---
 
-## Getting started
+## 核心特性
 
-Install Node.js 22.12+ and pnpm, then run:
+- **流式深度思考**：还原 DeepSeek-R1 思考链展示，支持折叠/展开动画、思考状态高亮扫光微动效与自动跟随滚动。
+- **联网搜索与引用溯源**：支持智能搜索模式，提供底部上拉式引用来源抽屉，点击来源可直接在内置独立浏览器中阅读网页原文。
+- **按住说话（Hold to Talk）**：还原长按录音交互面板与实时声波振幅动画，支持上滑取消与平滑色彩过渡。
+- **相册与多模态输入**：内置原生相册选取抽屉，支持相机拍照、相册多选、最近图片快速预取与微缩预览。
+- **原生沉浸与布局适配**：适配全面屏手势与系统安全区，软键盘弹起时输入框自适应对齐（`adjustResize`）。
+- **完善的内容排版**：内置完整 Markdown 解析引擎，支持 KaTeX 数学公式排版、代码语法高亮与一键复制、Mermaid 结构图表。
+- **深浅色主题自适应**：跟随系统自动切换深色/浅色模式，支持中英文双语界面。
+- **历史记录导入与导出**：支持将本地会话与图片打包为 ZIP 归档导出或恢复。
+
+---
+
+## 技术架构
+
+项目采用 Android 原生容器承载高性能 Web 交互内核的架构：
+
+- **Android 原生层**：基于 Java 17 与 Android SDK 37（最低兼容 Android 12 / API 32）。通过 WebView 加载本地构建产物，并封装系统级能力：API Key 经 Android Keystore 加密存储、原生麦克风录音采集（`AudioRecord`）、系统相册快速预取以及独立的网页浏览器（`SourceBrowserActivity`）。
+- **Web 交互层**：React 18 + TypeScript + Zustand 状态管理，基于 CSS Modules 进行交互细节调优，引入 KaTeX、Mermaid 与 Prism.js 提供排版渲染。
+- **构建系统**：Rspack 2 高速打包，与 Gradle `buildWeb` 构建任务无缝联动。
+
+---
+
+## 快速开始
+
+### 开发环境准备
+- **Node.js**：22.12 或更高版本
+- **pnpm**：包管理器
+- **JDK**：Java Development Kit 17 或更高版本
+- **Android SDK**：API Level 32 ~ 37
+
+### 1. 克隆代码与安装依赖
+```sh
+git clone https://github.com/lijiahua1024/DeepSeek-App-Replica.git
+cd DeepSeek-App-Replica
+pnpm install
+```
+
+### 2. 构建 Android APK
+在项目根目录下执行 Gradle 构建脚本（构建过程会自动运行 `pnpm build` 打包前端资源至 Android assets）：
+
+```powershell
+.\android\gradlew.bat -p android :app:assembleDebug
+```
+
+构建完成后，生成的调试安装包位于：
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+### 3. 本地独立调试（可选）
+如果仅需调试界面布局与交互逻辑，可启动本地开发服务器：
 
 ```sh
-git clone https://github.com/deepseek-ai/chat-demo.git
-cd chat-demo
-pnpm install
 pnpm dev
 ```
+启动后在浏览器中打开 `http://localhost:8090` 即可预览。
 
-Open http://localhost:8090.
+---
 
-To build the static site:
+## 使用说明
 
-```sh
-pnpm build
-```
+1. 首次打开应用后，点击左上角抽屉菜单进入「设置」。
+2. 在 API 配置中填入在 DeepSeek 开放平台申请的 API Key。
+3. 返回聊天界面，即可体验完整的多轮对话、深度思考、联网搜索与多模态能力。
 
-The output is written to `dist/`. Deploy it to a static web server or open `dist/index.html` directly. Opening the file directly requires browser support for storage on `file://` pages and an API service that permits their cross-origin requests.
+---
 
-## Features
-
-- Multiple conversations with automatic titles, renaming, and deletion; edit prompts, regenerate replies, and switch between message branches.
-- Streaming replies, deep thinking, smart search, link reading, and source citations; stop generation or continue eligible replies.
-- Upload, paste, or drag and drop attachments; use voice input and read replies aloud. A live audio spectrum appears in the first row of the input area while recording on mobile.
-- Markdown, syntax highlighting, KaTeX math, and Mermaid diagrams.
-- Simplified Chinese and English, light and dark themes, mobile layouts, location settings, and chat history import and export.
-
-## Data and storage
-
-Your API key and settings are stored in the browser's localStorage. Conversations and original attachments are stored in IndexedDB. Local data is isolated by browser profile and site origin. Sending messages, uploading attachments, and using speech features sends the relevant content to the configured API service.
-
-History import and export in Settings use ZIP archives. After confirmation and successful validation, importing replaces all local conversations and attachments. Exports include conversations and locally available original images, but exclude API keys, settings, and original non-image attachments. See the [history import/export documentation (Chinese)](src/services/chat/history/README.md) for the archive format and preservation details.
-
-Settings → Data → Delete all chats clears all local conversations, original attachments, and unsent drafts after confirmation. It stops ongoing replies and returns to a new chat. Your API key and settings are preserved; files already uploaded to the API service are not deleted.
-
-## Development
-
-| Command       | Description                  |
-| ------------- | ---------------------------- |
-| `pnpm dev`    | Start the development server |
-| `pnpm build`  | Build into `dist/`           |
-| `pnpm type`   | Run TypeScript type checks   |
-| `pnpm lint`   | Lint with oxlint             |
-| `pnpm format` | Format with oxfmt            |
-
-[rspack.config.ts](rspack.config.ts) uses `https://api.deepseek.com` by default. Use `createConfig({ apiOrigin, devServer })` to customize the API origin and development server proxy.
-
-Chat uses `deepseek-flash` by default through Anthropic-compatible Messages / Files APIs. Speech features use ASR / TTS endpoints. Requests include extensions for search, link reading, titles, and `latest_reminder`, so the configured service must support the corresponding capabilities. Supported attachment formats are determined by server-side validation.
+## 项目结构
 
 ```text
-src/
-  app/                 Application layout, themes, and global styles
-  components/          Chat, settings, Markdown, and other UI components
-  i18n/                English and Chinese translations
-  services/
-    api/               API requests, SSE, and protocol types
-    chat/              Conversations, message branches, storage, and history import/export
-    markdown/          Markdown parsing, syntax highlighting, and diagrams
-    speech/            Audio recording and read-aloud playback
-  utils/               Shared utilities
+├── android/            # Android 原生容器源码与 Gradle 工程
+│   └── app/src/main/   # 原生代码（Keystore 存储、录音机、相册、沙箱浏览器）
+├── src/
+│   ├── app/            # 应用整体布局、主题体系与 Android 平台适配
+│   ├── components/     # UI 组件库（聊天流、输入框、搜索抽屉、设置面板等）
+│   ├── services/       # 业务逻辑（API 请求、流式解析、会话存储与备份）
+│   ├── i18n/           # 多语言文案（中/英）
+│   └── utils/          # 通用工具函数
+├── rspack.config.ts    # Rspack 打包配置
+└── package.json        # 项目配置与脚本入口
 ```
 
-## License
+---
 
-[MIT](LICENSE). The build copies the license to `dist/LICENSE`; include it when distributing the app. Third-party dependencies are subject to their own licenses.
+## 免责声明
+
+本项目仅供个人技术研究与前端/移动端交互学习交流使用，非 DeepSeek 官方发布版本。项目内所有商标、标识及版权均归其各自所有者所有。
+
+## 开源协议
+
+本项目采用 [GPL-3.0 许可证](LICENSE)。部分基础代码源自 DeepSeek 官方开源的 [chat-demo](https://github.com/deepseek-ai/chat-demo)（基于 MIT 许可证），依其条款保留原作者版权声明。
