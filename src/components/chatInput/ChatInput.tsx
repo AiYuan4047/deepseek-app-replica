@@ -1,5 +1,6 @@
 import clsx from 'clsx'
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { create } from 'zustand'
 import { android } from '../../app/android.js'
 import {
   IconGlobeLanguageOutline14,
@@ -39,6 +40,8 @@ import { useHoldToTalk } from './useHoldToTalk.js'
 import { useTranslate } from '../../i18n/index.js'
 import styles from './ChatInput.module.css'
 
+const useVoiceMode = create<{ enabled: boolean }>(() => ({ enabled: false }))
+
 /** 输入框：自适应高度的文本框 + 文件 + 深度思考与智能搜索开关 + 语音输入 + 发送 / 停止 */
 export const ChatInput = memo(function ChatInput({ sessionId }: { sessionId: string | null }) {
   // 切换目标时释放录音、转写和 DOM 状态；文字与附件由草稿服务保留。
@@ -61,7 +64,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const togglesRef = useRef<HTMLDivElement>(null)
-  const [voiceMode, setVoiceMode] = useState(false)
+  const voiceMode = useVoiceMode((state) => state.enabled)
   const [showAttachments, setShowAttachments] = useState(false)
   const [typing, setTyping] = useState(false)
   const sendSpoken = useRef(false)
@@ -153,6 +156,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
 
   // 移动端录音时用频谱替代输入框内容
   const recording = voice.status === 'recording'
+  const voiceOverlayActive = recording || voice.status === 'transcribing'
 
   // 排队、上传中或上传失败的附件都留在输入框，全部上传成功后才能发送
   const canSend = !importingHistory && !streaming && voice.status === 'idle' && draftReady
@@ -200,7 +204,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
         className={clsx(
           styles.wrapper,
           sessionId === null ? styles.home : styles.session,
-          android && recording && styles.recordingCard
+          android && voiceOverlayActive && styles.recordingCard
         )}
         onClick={(event) => {
           if (event.target === event.currentTarget) {
@@ -335,7 +339,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
                     setShowAttachments(!showAttachments)
                   }}
                 />
-                {showSend ? null : (
+                {draftReady ? null : (
                   <IconButton
                     size="xl"
                     tone="primary"
@@ -344,7 +348,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
                     aria-pressed={voiceMode}
                     onClick={() => {
                       voice.cancel()
-                      setVoiceMode(!voiceMode)
+                      useVoiceMode.setState({ enabled: !voiceMode })
                     }}
                   />
                 )}
@@ -422,7 +426,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
             }}
           />
           <AndroidVoiceOverlay
-            active={recording}
+            active={voiceOverlayActive}
             canceling={hold.canceling}
             level={voice.getLevel}
           />

@@ -83,7 +83,7 @@ export const useVoiceInput = (onText: (text: string) => void) => {
       if (text.trim()) {
         onTextRef.current(text.trim())
       } else {
-        showToast({ key: 'voiceInputEmpty' })
+        showToast({ key: android ? 'androidVoiceInputEmpty' : 'voiceInputEmpty' })
       }
     } catch {
       if (operationRef.current === operation && !controller?.signal.aborted) {

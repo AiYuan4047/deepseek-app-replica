@@ -186,6 +186,7 @@ export const en = {
   voiceInputTooLong: 'Recording is too long. Please shorten it and try again.',
   voiceInputFailed: 'Speech recognition failed. Please try again later.',
   voiceInputEmpty: 'No speech detected',
+  androidVoiceInputEmpty: 'No speech detected',
   voiceInputLimitReached: 'Maximum recording length reached',
   voiceInputRequiresHttps: 'Voice input requires HTTPS',
   apiKeyInvalidRetry: 'Invalid API Key. Please change it and try again.',
