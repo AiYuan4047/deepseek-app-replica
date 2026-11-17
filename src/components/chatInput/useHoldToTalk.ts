@@ -28,6 +28,7 @@ export const useHoldToTalk = (
     const start = () => {
       if (gesture.current === held && beforeStart()) {
         held.active = true
+        setCanceling(false)
         void voice.start()
       }
     }
@@ -45,7 +46,6 @@ export const useHoldToTalk = (
     }
     clearTimeout(timer.current)
     gesture.current = null
-    setCanceling(false)
     if (held.active) {
       event.preventDefault()
       if (interrupted || held.canceling) {

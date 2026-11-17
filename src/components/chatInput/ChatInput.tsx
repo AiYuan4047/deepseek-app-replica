@@ -34,6 +34,7 @@ import { useVoiceInput } from './useVoiceInput.js'
 import { VoiceButton } from './VoiceButton.js'
 import { Spectrum } from './Spectrum.js'
 import { AndroidAttachments } from './AndroidAttachments.js'
+import { AndroidVoiceOverlay } from './AndroidVoiceOverlay.js'
 import { useHoldToTalk } from './useHoldToTalk.js'
 import { useTranslate } from '../../i18n/index.js'
 import styles from './ChatInput.module.css'
@@ -195,6 +196,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   return (
     <div className={styles.composer}>
       <div
+        data-drawer-gesture-ignore=""
         className={clsx(
           styles.wrapper,
           sessionId === null ? styles.home : styles.session,
@@ -419,15 +421,11 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
               acceptFiles(files)
             }}
           />
-          {recording ? (
-            <div
-              className={clsx(styles.voiceOverlay, hold.canceling && styles.voiceCancel)}
-              role="status"
-            >
-              <div>{t(hold.canceling ? 'androidReleaseToCancel' : 'androidSlideToCancel')}</div>
-              <Spectrum getAnalyser={voice.getAnalyser} getLevel={voice.getLevel} />
-            </div>
-          ) : null}
+          <AndroidVoiceOverlay
+            active={recording}
+            canceling={hold.canceling}
+            level={voice.getLevel}
+          />
         </>
       ) : null}
     </div>

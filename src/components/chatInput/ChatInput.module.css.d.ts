@@ -2,8 +2,6 @@ declare const styles: {
   readonly composer: string
   readonly holdButton: string
   readonly recordingCard: string
-  readonly voiceOverlay: string
-  readonly voiceCancel: string
   readonly wrapper: string
   readonly session: string
   readonly home: string
