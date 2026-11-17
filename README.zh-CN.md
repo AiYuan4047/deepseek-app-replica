@@ -1,5 +1,18 @@
 # chat-demo
 
+## Android 复刻
+
+Android 版复用本仓库中的 MIT 版 [DeepSeek Chat Demo](https://github.com/deepseek-ai/chat-demo)。首次打开时输入 DeepSeek 开放平台 API Key，校验通过后由 Android Keystore 加密保存。会话数据保存在应用本地。
+
+需要 Node.js 22.12+、pnpm、JDK 17+ 和 Android SDK 37。构建后，调试 APK 位于 `android/app/build/outputs/apk/debug/app-debug.apk`。
+
+```powershell
+pnpm install --frozen-lockfile
+.\android\gradlew.bat -p android :app:assembleDebug
+```
+
+界面参考设备为小米 10（1080×2340，440 dpi），参考应用为 DeepSeek 2.8.0（298）。鲸鱼图标来自 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/web/public/favicon.svg)。
+
 [English](README.md) | 简体中文
 
 基于 DeepSeek API 的静态聊天示例。无需应用后端，浏览器直接请求配置的 API 服务。

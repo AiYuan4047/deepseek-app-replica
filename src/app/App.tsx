@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { android } from './android.js'
 import { useTranslate } from '../i18n/index.js'
 import { useSettings } from '../services/settings.js'
 import { useIsMobile, useMobileViewport, usePreventPageScroll } from './viewport.js'
@@ -10,25 +11,27 @@ import {
   useChatStore,
 } from '../services/chat/store.js'
 import { SearchPanel } from '../components/search/SearchPanel.js'
-import { closeSearchPanel } from '../components/search/searchPanelState.js'
+import { closeSearchPanel, useSearchPanel } from '../components/search/searchPanelState.js'
 import { SessionView } from '../components/session/SessionView.js'
 import { MobileHeader } from '../components/session/MobileHeader.js'
 import { Welcome } from '../components/session/Welcome.js'
 import { ensureApiKey } from '../components/settings/settingsDialogState.js'
 import { SettingsDialog } from '../components/settings/SettingsDialog.js'
+import { ApiKeyScreen } from '../components/settings/ApiKeyScreen.js'
 import { Toast } from '../components/base/Toast.js'
 import { showToast } from '../components/base/toastState.js'
 import { onUploadNotice } from '../services/attachments.js'
 import { Button } from '../components/base/Button.js'
 import { stopReadAloud } from '../services/speech/readAloud.js'
 import { CollapsedSider } from '../components/sider/CollapsedSider.js'
-import { closeMobileSider } from '../components/sider/mobileSiderState.js'
+import { closeMobileSider, useMobileSider } from '../components/sider/mobileSiderState.js'
 import { MobileSider, Sider } from '../components/sider/Sider.js'
 import styles from './App.module.css'
 
 export const App = () => {
   const t = useTranslate()
   const isMobile = useIsMobile()
+  const apiKey = useSettings((state) => state.apiKey)
   const locale = useSettings((state) => state.locale)
   // 移动端侧边栏以独立抽屉管理开合状态
   const siderCollapsed = useSettings((state) => state.siderCollapsed) && !isMobile
@@ -70,8 +73,34 @@ export const App = () => {
   useEffect(() => {
     void initChat()
     // 首次打开先在设置里输入 API Key
-    ensureApiKey()
+    if (!android) {
+      ensureApiKey()
+    }
   }, [])
+
+  useEffect(() => {
+    if (!android) {
+      return
+    }
+    const onBack = (event: Event) => {
+      if (document.querySelector('[role="dialog"]')) {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      } else if (useSearchPanel.getState().entry) {
+        closeSearchPanel()
+      } else if (useMobileSider.getState().open) {
+        closeMobileSider()
+      } else {
+        return
+      }
+      event.preventDefault()
+    }
+    window.addEventListener('android-back', onBack)
+    return () => window.removeEventListener('android-back', onBack)
+  }, [])
+
+  if (android && !apiKey) {
+    return <ApiKeyScreen />
+  }
 
   return (
     <>

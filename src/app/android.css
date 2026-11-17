@@ -1,0 +1,11 @@
+[data-android] body {
+  --dsw-font-family: Roboto, 'Noto Sans CJK SC', sans-serif;
+}
+
+[data-android] body:not([data-ds-dark-theme]) {
+  --dsw-alias-bg-base: #fdfdfd;
+  --dsw-alias-label-primary: #111;
+  --dsw-specific-input-major: #fdfdfd;
+  --dsw-alias-label-caption: #b6b7b8;
+  --dsw-alias-brand-text: #4168ff;
+}

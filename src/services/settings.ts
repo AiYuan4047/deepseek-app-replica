@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { android } from '../app/android.js'
 import type { TtsVoice } from './api/speech.js'
 import { normalizeLocation, type UserLocation } from './location.js'
 
@@ -88,13 +89,13 @@ const initialThemePreference = (): ThemePreference => {
 const initialTtsVoice = (): TtsVoice => (read(KEYS.ttsVoice) === 'tide' ? 'tide' : 'stella')
 
 export const useSettings = create<Settings>(() => ({
-  apiKey: read(KEYS.apiKey),
+  apiKey: android ? android.readApiKey() : read(KEYS.apiKey),
   locale: initialLocale(),
   location: initialLocation(),
   themePreference: initialThemePreference(),
   ttsVoice: initialTtsVoice(),
   thinking: read(KEYS.thinking) === 'true',
-  search: read(KEYS.search) === 'true',
+  search: (read(KEYS.search) ?? (android ? 'true' : 'false')) === 'true',
   siderCollapsed: read(KEYS.siderCollapsed) === 'true',
 }))
 
@@ -120,8 +121,15 @@ export const setTtsVoice = (ttsVoice: TtsVoice) => {
 }
 
 export const setApiKey = (apiKey: string | null) => {
-  write(KEYS.apiKey, apiKey)
+  if (android) {
+    if (!android.writeApiKey(apiKey)) {
+      return false
+    }
+  } else {
+    write(KEYS.apiKey, apiKey)
+  }
   useSettings.setState({ apiKey })
+  return true
 }
 
 export const setThinking = (thinking: boolean) => {

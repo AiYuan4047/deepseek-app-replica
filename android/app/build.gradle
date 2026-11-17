@@ -1,0 +1,37 @@
+plugins {
+    id 'com.android.application' version '9.4.0'
+}
+
+android {
+    namespace = 'com.deepseek.replica'
+    compileSdk = 37
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    defaultConfig {
+        applicationId = 'com.deepseek.replica'
+        minSdk = 32
+        targetSdk = 36
+        versionCode = 1
+        versionName = '0.1.0'
+    }
+}
+
+def webProject = rootProject.projectDir.parentFile
+def webOutput = new File(webProject, 'dist')
+
+tasks.register('buildWeb', Exec) {
+    workingDir webProject
+    commandLine org.gradle.internal.os.OperatingSystem.current().isWindows()
+        ? ['cmd', '/d', '/c', 'pnpm', 'build']
+        : ['pnpm', 'build']
+    inputs.files(new File(webProject, 'package.json'), new File(webProject, 'pnpm-lock.yaml'),
+        new File(webProject, 'rspack.config.ts'))
+    inputs.dir(new File(webProject, 'src'))
+    outputs.dir(webOutput)
+}
+
+android.sourceSets.main.assets.srcDir(webOutput)
+tasks.named('preBuild').configure { dependsOn('buildWeb') }
