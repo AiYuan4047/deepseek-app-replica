@@ -140,6 +140,7 @@ export const en = {
   apiKeyVerificationFailed: 'Verification failed: {message}',
   historyImport: 'Import chat history',
   historyImportConfirm: 'Import',
+  historyImporting: 'Importing chat history…',
   historyImportConfirmTitle: 'Import chat history?',
   historyImportConfirmDescription:
     'The uploaded chat history will replace all your current chats. Import anyway?',

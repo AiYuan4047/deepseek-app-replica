@@ -203,19 +203,19 @@ public final class MainActivity extends Activity {
                 }
                 return true;
             }
-            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
-                .setType("*/*")
-                .putExtra(Intent.EXTRA_ALLOW_MULTIPLE,
-                    params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
+            boolean multiple = params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE;
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE);
+            if (multiple) intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
             String[] mimeTypes = Arrays.stream(params.getAcceptTypes())
                 .map(type -> type.startsWith(".")
                     ? MimeTypeMap.getSingleton().getMimeTypeFromExtension(type.substring(1)) : type)
                 .filter(type -> type != null && type.contains("/"))
                 .distinct().toArray(String[]::new);
-            if (mimeTypes.length > 0) intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+            intent.setType(mimeTypes.length == 1 ? mimeTypes[0] : "*/*");
+            if (mimeTypes.length > 1) intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
             if (Build.VERSION.SDK_INT >= 33 && Arrays.equals(mimeTypes, new String[]{"image/*"})) {
                 Intent picker = new Intent(MediaStore.ACTION_PICK_IMAGES).setType("image/*");
-                if (params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE) {
+                if (multiple) {
                     picker.putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX, 10);
                 }
                 try {

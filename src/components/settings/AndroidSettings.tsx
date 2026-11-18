@@ -1,8 +1,13 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { android, saveAndroidHistory } from '../../app/android.js'
-import { useTranslate } from '../../i18n/index.js'
+import { useTranslate, type LinkedMessage } from '../../i18n/index.js'
 import type { TtsVoice } from '../../services/api/speech.js'
-import { clearHistory, exportHistory, importHistory } from '../../services/chat/backup.js'
+import {
+  BackupError,
+  clearHistory,
+  exportHistory,
+  importHistory,
+} from '../../services/chat/backup.js'
 import { useChatStore } from '../../services/chat/store.js'
 import {
   setApiKey,
@@ -38,6 +43,7 @@ type Page =
   | 'root'
   | 'account'
   | 'data'
+  | 'export'
   | 'font'
   | 'personalization'
   | 'agreements'
@@ -84,6 +90,7 @@ const Row = ({
   href,
   control,
   danger = false,
+  disabled = false,
   arrow = Boolean(onClick || href),
 }: {
   label: string
@@ -93,6 +100,7 @@ const Row = ({
   href?: string
   control?: ReactNode
   danger?: boolean
+  disabled?: boolean
   arrow?: boolean
 }) => {
   const contents = (
@@ -117,7 +125,13 @@ const Row = ({
   }
   if (onClick) {
     return (
-      <button type="button" className={styles.row} data-danger={danger} onClick={onClick}>
+      <button
+        type="button"
+        className={styles.row}
+        data-danger={danger}
+        disabled={disabled}
+        onClick={onClick}
+      >
         {contents}
       </button>
     )
@@ -215,6 +229,9 @@ const Settings = ({ start }: { start: Page }) => {
   const [tone, setTone] = useState(ttsVoice)
   const [busy, setBusy] = useState(false)
   const [file, setFile] = useState<File | null>(null)
+  const [importStatus, setImportStatus] = useState<LinkedMessage | null>(null)
+  const [archive, setArchive] = useState<Awaited<ReturnType<typeof exportHistory>> | null>(null)
+  const importInput = useRef<HTMLInputElement>(null)
   const sessions = useChatStore((state) => state.sessions.length)
   const editor = useApiKeyEditor()
 
@@ -222,6 +239,7 @@ const Settings = ({ start }: { start: Page }) => {
     root: t('settings'),
     account: tr('账号管理', 'Account management'),
     data: tr('数据管理', 'Data management'),
+    export: t('exportAllLabel'),
     font: tr('字体大小', 'Text size'),
     personalization: tr('个性化', 'Personalization'),
     agreements: tr('服务协议', 'Terms and policies'),
@@ -235,7 +253,6 @@ const Settings = ({ start }: { start: Page }) => {
   const follow = tr('跟随系统', 'Follow system')
   const logout = tr('退出登录', 'Sign out')
   const clear = tr('删除所有历史对话', 'Delete all conversations')
-  const history = tr('导出所有历史对话', 'Export all conversations')
   const optimize = tr('数据用于优化体验', 'Use data to improve the experience')
   const themes: { id: ThemePreference; label: string }[] = [
     { id: 'system', label: tr('系统', 'System') },
@@ -274,7 +291,7 @@ const Settings = ({ start }: { start: Page }) => {
     } else if (page === 'root') {
       closeSettings()
     } else {
-      setPage(page === 'shared' ? 'data' : 'root')
+      setPage(page === 'shared' || page === 'export' ? 'data' : 'root')
     }
   }
 
@@ -287,13 +304,16 @@ const Settings = ({ start }: { start: Page }) => {
     return () => window.removeEventListener('android-back', onBack)
   })
 
-  const saveArchive = async () => {
+  const runExportAction = async (action: () => Promise<void>) => {
     setBusy(true)
     try {
-      const { name, blob } = await exportHistory()
-      await saveAndroidHistory(name, blob)
-    } catch {
-      showToast({ key: 'historyExportFailed', params: { message: '' } })
+      await action()
+    } catch (error) {
+      showToast({
+        key: 'historyExportFailed',
+        params: { message: error instanceof Error ? error.message : String(error) },
+        type: 'error',
+      })
     } finally {
       setBusy(false)
     }
@@ -314,18 +334,28 @@ const Settings = ({ start }: { start: Page }) => {
     setBusy(true)
     try {
       if (popup === 'import' && file) {
-        await importHistory(file)
+        setPopup(null)
+        setFile(null)
+        setImportStatus({ key: 'historyImporting' })
+        const count = await importHistory(file)
+        setImportStatus({
+          key: count === 1 ? 'historyImportedOne' : 'historyImported',
+          params: { count },
+        })
       } else if (popup === 'delete') {
         await clearHistory()
         showToast({ key: 'historyDeleted' })
+        setPopup(null)
       }
-      setPopup(null)
-      setFile(null)
-    } catch {
-      showToast({
-        key: popup === 'import' ? 'historyImportFailed' : 'historyDeleteFailed',
-        type: 'error',
-      })
+    } catch (error) {
+      if (popup === 'import') {
+        setImportStatus({
+          key: error instanceof BackupError ? error.key : 'historyImportFailed',
+          type: 'error',
+        })
+      } else {
+        showToast({ key: 'historyDeleteFailed', type: 'error' })
+      }
     } finally {
       setBusy(false)
     }
@@ -438,41 +468,83 @@ const Settings = ({ start }: { start: Page }) => {
               )}
             </p>
             <Group>
-              <Row label={labels.shared} onClick={() => setPage('shared')} />
+              <Row label={labels.shared} disabled={busy} onClick={() => setPage('shared')} />
+            </Group>
+            <Group>
+              <Row label={labels.export} disabled={busy} onClick={() => setPage('export')} />
             </Group>
             <Group>
               <Row
-                label={history}
-                onClick={() => {
-                  if (!busy && sessions) {
-                    void saveArchive()
-                  } else if (!sessions) {
-                    showToast({ key: 'androidNoChats' })
+                label={clear}
+                danger
+                arrow={false}
+                disabled={busy}
+                onClick={() => setPopup('delete')}
+              />
+            </Group>
+            <Group>
+              <Row
+                label={t('historyImport')}
+                arrow={false}
+                disabled={busy}
+                onClick={() => importInput.current?.click()}
+              />
+              <input
+                ref={importInput}
+                hidden
+                type="file"
+                accept=".zip,application/zip"
+                onChange={(event) => {
+                  const selected = event.target.files?.[0]
+                  event.target.value = ''
+                  if (selected) {
+                    setFile(selected)
+                    setPopup('import')
                   }
                 }}
               />
             </Group>
+            {importStatus ? (
+              <p
+                className={styles.caption}
+                role={importStatus.type === 'error' ? 'alert' : 'status'}
+              >
+                {t(importStatus.key, importStatus.params)}
+              </p>
+            ) : null}
+          </>
+        ) : null}
+        {page === 'export' ? (
+          <>
             <Group>
-              <Row label={clear} danger arrow={false} onClick={() => setPopup('delete')} />
+              <Row
+                label={archive ? tr('重新导出', 'Export again') : tr('导出', 'Export')}
+                arrow={false}
+                disabled={busy || !sessions}
+                onClick={() =>
+                  void runExportAction(async () => {
+                    setArchive(await exportHistory())
+                  })
+                }
+              />
             </Group>
-            <Group>
-              <label className={styles.row}>
-                {t('historyImport')}
-                <input
-                  hidden
-                  type="file"
-                  accept=".zip,application/zip"
-                  onChange={(event) => {
-                    const selected = event.target.files?.[0]
-                    event.target.value = ''
-                    if (selected) {
-                      setFile(selected)
-                      setPopup('import')
-                    }
-                  }}
+            {archive ? (
+              <Group>
+                <Row
+                  label={tr('保存到设备', 'Save to device')}
+                  arrow={false}
+                  disabled={busy}
+                  onClick={() =>
+                    void runExportAction(() => saveAndroidHistory(archive.name, archive.blob))
+                  }
                 />
-              </label>
-            </Group>
+              </Group>
+            ) : null}
+            <p className={styles.caption} role="status">
+              {busy
+                ? tr('正在处理归档…', 'Working on the archive…')
+                : (archive?.name ?? t(sessions ? 'historyExportDescription' : 'androidNoChats'))}
+            </p>
           </>
         ) : null}
         {page === 'font' ? (
@@ -680,7 +752,7 @@ const Settings = ({ start }: { start: Page }) => {
                 data-danger={popup !== 'import'}
                 onClick={() => void confirmAction()}
               >
-                {t('confirm')}
+                {t(popup === 'import' ? 'historyImportConfirm' : 'confirm')}
               </button>
             </div>
           </section>
