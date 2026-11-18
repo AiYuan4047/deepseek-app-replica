@@ -30,6 +30,10 @@ import { ApiKeyConfirm, ApiKeyField, useApiKeyEditor } from './ApiKeyField.js'
 import { closeSettings, useSettingsDialog } from './settingsDialogState.js'
 import styles from './AndroidSettings.module.css'
 
+const appVersion = document.querySelector<HTMLMetaElement>(
+  'meta[name="application-version"]'
+)?.content
+
 type Page =
   | 'root'
   | 'account'
@@ -387,7 +391,7 @@ const Settings = ({ start }: { start: Page }) => {
               />
             </Group>
             <Group label={tr('关于', 'About')}>
-              <Row label={tr('版本信息', 'Version')} value="0.1.0" icon={<Info />} />
+              <Row label={tr('版本信息', 'Version')} value={appVersion} icon={<Info />} />
               <Row
                 label={labels.agreements}
                 icon={<IconLinkOutline16 />}
