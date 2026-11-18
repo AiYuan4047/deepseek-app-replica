@@ -385,16 +385,18 @@ const waitForIdle = (sessionId?: string) =>
     })
   })
 
-/**
- * 替换历史对话：先写入暂存，成功后原子替换旧记录；写入为空即删除全部会话与附件。
- * 期间停止生成并禁止修改会话；失败时清除暂存，保留原有记录。
- */
+let replacingHistory = false
+
+/** 先写入暂存。校验通过后暂停会话修改、停止生成，再原子替换历史。 */
 export const replaceHistory = async (write: () => Promise<void>): Promise<number> => {
-  if (get().importingHistory) {
+  if (replacingHistory) {
     throw new Error('History replacement is already in progress')
   }
-  set({ importingHistory: true })
+  replacingHistory = true
   try {
+    await db.clearStaging()
+    await write()
+    set({ importingHistory: true })
     for (const controller of Object.values(get().streaming)) {
       controller.abort()
     }
@@ -404,15 +406,7 @@ export const replaceHistory = async (write: () => Promise<void>): Promise<number
     initTask = undefined
     sessionLoads.clear()
     await waitForIdle()
-    await db.clearStaging()
-    let summaries: SessionSummary[]
-    try {
-      await write()
-      summaries = await db.commitStaging()
-    } catch (error) {
-      await db.clearStaging().catch(db.reportStorageError('clear unfinished history replacement'))
-      throw error
-    }
+    const summaries = await db.commitStaging()
     sessionAccess.clear()
     unsavedSessions.clear()
     pendingFiles.clear()
@@ -427,15 +421,21 @@ export const replaceHistory = async (write: () => Promise<void>): Promise<number
       activeId: null,
     })
     return summaries.length
+  } catch (error) {
+    await db.clearStaging().catch(db.reportStorageError('clear unfinished history replacement'))
+    throw error
   } finally {
-    set({ importingHistory: false })
-    retrySaveSessions()
-    const { activeId, ready } = get()
-    // 替换失败时恢复被取消的详情读取，原有记录继续可用。
-    if (activeId !== null) {
-      void ensureSessionLoaded(activeId)
-    } else if (!ready) {
-      void initChat()
+    replacingHistory = false
+    if (get().importingHistory) {
+      set({ importingHistory: false })
+      retrySaveSessions()
+      const { activeId, ready } = get()
+      // 提交失败时恢复被取消的详情读取。
+      if (activeId !== null) {
+        void ensureSessionLoaded(activeId)
+      } else if (!ready) {
+        void initChat()
+      }
     }
   }
 }

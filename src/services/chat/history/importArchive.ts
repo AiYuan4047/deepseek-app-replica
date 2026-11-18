@@ -51,28 +51,6 @@ const readJson = async (entry: ArchiveEntry): Promise<unknown> => {
 }
 
 /**
- * 检查 ZIP 格式、首个 manifest 条目及格式版本。
- * 校验失败时保留正在生成的回答和现有暂存数据。
- */
-export const checkArchiveFormat = async (file: File): Promise<void> => {
-  if (!(await isZipFile(file))) {
-    fail('backupUnrecognized')
-  }
-  try {
-    for await (const entry of readArchive(file)) {
-      if (entry.path !== MANIFEST_PATH) {
-        fail('backupUnrecognized')
-      }
-      checkManifest(await readJson(entry))
-      return
-    }
-  } catch (error) {
-    throw error instanceof ArchiveError ? new BackupError('backupIncomplete') : error
-  }
-  fail('backupUnrecognized')
-}
-
-/**
  * 流式导入：manifest → user（不导入）→ 全部会话 JSON → index → 全部图片。
  * 也支持会话与图片交错排列、index 位于末尾的条目顺序。
  * 会话读完立即暂存，只保留图片路径映射；图片全部读完后逐会话回填 MIME，不改变图片身份。
