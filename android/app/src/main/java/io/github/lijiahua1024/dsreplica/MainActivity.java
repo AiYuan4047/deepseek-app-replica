@@ -53,7 +53,8 @@ public final class MainActivity extends Activity {
     private boolean askedForPhotos;
     private Uri capture;
     private RecentPhotos recentPhotos;
-    private HistoryExport historyExport;
+    private FileExport historyExport;
+    private ImageSave imageSave;
     private NativeRecorder recorder;
     private final ExecutorService photoExecutor = Executors.newSingleThreadExecutor();
 
@@ -62,7 +63,8 @@ public final class MainActivity extends Activity {
         super.onCreate(state);
         keys = new ApiKeyStore(this);
         recentPhotos = new RecentPhotos(getContentResolver());
-        historyExport = new HistoryExport(getContentResolver());
+        historyExport = new FileExport(getContentResolver());
+        imageSave = new ImageSave(getContentResolver());
         recorder = new NativeRecorder();
         frame = new FrameLayout(this);
         webView = new WebView(this);
@@ -348,6 +350,7 @@ public final class MainActivity extends Activity {
         if (fileCallback != null) fileCallback.onReceiveValue(null);
         recorder.finish(false);
         historyExport.close();
+        imageSave.finish(false);
         frame.removeView(webView);
         webView.destroy();
         super.onDestroy();
@@ -424,6 +427,15 @@ public final class MainActivity extends Activity {
 
         @JavascriptInterface
         public boolean finishHistoryExport() { return historyExport.close(); }
+
+        @JavascriptInterface
+        public boolean beginImageSave(String name, String mime) { return imageSave.begin(name, mime); }
+
+        @JavascriptInterface
+        public boolean writeImageSave(String bytes) { return imageSave.append(bytes); }
+
+        @JavascriptInterface
+        public boolean finishImageSave(boolean keep) { return imageSave.finish(keep); }
 
         @JavascriptInterface
         public void requestRecording() {

@@ -7,11 +7,11 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
-final class HistoryExport {
+final class FileExport {
     private final ContentResolver resolver;
     private OutputStream output;
 
-    HistoryExport(ContentResolver resolver) {
+    FileExport(ContentResolver resolver) {
         this.resolver = resolver;
     }
 
