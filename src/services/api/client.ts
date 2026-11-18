@@ -1,5 +1,5 @@
 import { translate, type TranslationMessage } from '../../i18n/index.js'
-import { streamOpenAIMessage } from './openai.js'
+import { openAIPath, streamOpenAIMessage } from './openai.js'
 import { readMessageEvent } from './parseEvent.js'
 import { readServerSentEvents } from './sse.js'
 import type {
@@ -96,22 +96,23 @@ const anthropicHeaders = (apiKey: string, beta: boolean): Record<string, string>
   ...(beta ? { 'anthropic-beta': FILES_BETA } : {}),
 })
 
-/** 用 GET /models（Anthropic 模式）或 GET /v1/models（OpenAI 模式，回退 /models）校验配置（不产生费用） */
+/** 用 GET /models（Anthropic 模式）或 OpenAI 兼容的 /v1/models 校验配置（不产生费用） */
 export const verifyApiKey = async (
   config: Pick<ApiConfig, 'origin' | 'apiKey' | 'protocol'>,
   signal?: AbortSignal
 ): Promise<void> => {
   if (config.protocol === 'openai') {
     try {
-      await request(`${config.origin}/v1/models`, {
+      await request(openAIPath(config.origin, 'models'), {
         method: 'GET',
         headers: { Authorization: `Bearer ${config.apiKey}` },
         signal,
       })
     } catch (error) {
-      // 部分兼容站把模型列表放在 /models，404 时回退一次
+      // 部分兼容站把模型列表放在根路径 /models，404 时回退一次
       if (error instanceof ApiError && error.status === 404) {
-        await request(`${config.origin}/models`, {
+        const root = config.origin.replace(/\/v\d+\/?$/, '').replace(/\/+$/, '')
+        await request(`${root}/models`, {
           method: 'GET',
           headers: { Authorization: `Bearer ${config.apiKey}` },
           signal,

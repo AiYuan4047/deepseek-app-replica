@@ -18,6 +18,12 @@ type OpenAIChatBody = {
   stream: true
 }
 
+/** OpenAI 兼容端点：API 地址已以 /v1 结尾时不重复拼接 v1。 */
+export const openAIPath = (origin: string, suffix: 'models' | 'chat/completions'): string => {
+  const base = origin.replace(/\/+$/, '')
+  return /\/v\d+$/.test(base) ? `${base}/${suffix}` : `${base}/v1/${suffix}`
+}
+
 /** 把 Anthropic 兼容的请求体转成 OpenAI 请求体；latest_reminder 与文件块在 OpenAI 模式下无对应，忽略。 */
 export const toOpenAIBody = (body: CreateMessageRequest, model: string): OpenAIChatBody => {
   const messages: OpenAIChatMessage[] = []
@@ -205,7 +211,7 @@ export async function* streamOpenAIMessage(
   model: string,
   signal: AbortSignal
 ): AsyncGenerator<MessageStreamEvent> {
-  const response = await request(`${origin}/v1/chat/completions`, {
+  const response = await request(openAIPath(origin, 'chat/completions'), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,

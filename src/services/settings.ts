@@ -12,9 +12,9 @@ export type ThemePreference = 'light' | 'dark' | 'system'
 /** 接口协议：DeepSeek/Anthropic 兼容或通用 OpenAI 兼容 */
 export type ApiProtocol = 'anthropic' | 'openai'
 
-/** 默认 API 地址与模型，兼容 DeepSeek 官方 */
-export const DEFAULT_API_ORIGIN = 'https://api.deepseek.com'
-export const DEFAULT_MODEL = 'deepseek-flash'
+/** 默认 API 地址与模型（OpenAI 兼容协议） */
+export const DEFAULT_API_ORIGIN = 'https://token.sensenova.cn/v1'
+export const DEFAULT_MODEL = 'sensenova-6.8-flash-lite'
 
 /** 本机设置，存 localStorage：API 配置、语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态 */
 type Settings = {
@@ -136,10 +136,10 @@ export const useSettings = create<Settings>(() => ({
   apiKey: android ? android.readApiKey() : read(KEYS.apiKey),
   model: android ? (readApiConfigValue()?.model ?? DEFAULT_MODEL) : (read(KEYS.model) ?? DEFAULT_MODEL),
   apiProtocol: android
-    ? (readApiConfigValue()?.protocol ?? 'anthropic')
-    : read(KEYS.apiProtocol) === 'openai'
-      ? 'openai'
-      : 'anthropic',
+    ? (readApiConfigValue()?.protocol ?? 'openai')
+    : read(KEYS.apiProtocol) === 'anthropic'
+      ? 'anthropic'
+      : 'openai',
   locale: resolveLocale(initialLocalePreference()),
   localePreference: initialLocalePreference(),
   location: initialLocation(),
