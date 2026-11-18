@@ -1,4 +1,5 @@
 import { translate, type TranslationMessage } from '../../i18n/index.js'
+import { streamOpenAIMessage } from './openai.js'
 import { readMessageEvent } from './parseEvent.js'
 import { readServerSentEvents } from './sse.js'
 import type {
@@ -9,10 +10,16 @@ import type {
   MessageStreamEvent,
 } from './types.js'
 
-/** 构建期 API 地址，默认 https://api.deepseek.com；本地开发支持开发服务器代理 */
-export const API_ORIGIN = __API_ORIGIN__
+/** 运行时 API 配置，由设置界面提供，覆盖 DeepSeek 官方默认值。 */
+export type ApiConfig = {
+  origin: string
+  apiKey: string
+  model: string
+  protocol: 'anthropic' | 'openai'
+}
+
 /** Anthropic 兼容接口的前缀 */
-const ANTHROPIC_BASE_URL = `${API_ORIGIN}/anthropic/v1`
+const anthropicBaseUrl = (origin: string) => `${origin}/anthropic/v1`
 /** 引用 Files API 上传的图片、调用 Anthropic 兼容 Files API 时必须携带 */
 const FILES_BETA = 'files-api-2025-04-14'
 
@@ -89,21 +96,46 @@ const anthropicHeaders = (apiKey: string, beta: boolean): Record<string, string>
   ...(beta ? { 'anthropic-beta': FILES_BETA } : {}),
 })
 
-/** 用 GET /models 校验 API Key（不产生费用） */
-export const verifyApiKey = async (apiKey: string, signal?: AbortSignal): Promise<void> => {
-  await request(`${API_ORIGIN}/models`, {
+/** 用 GET /models（Anthropic 模式）或 GET /v1/models（OpenAI 模式，回退 /models）校验配置（不产生费用） */
+export const verifyApiKey = async (
+  config: Pick<ApiConfig, 'origin' | 'apiKey' | 'protocol'>,
+  signal?: AbortSignal
+): Promise<void> => {
+  if (config.protocol === 'openai') {
+    try {
+      await request(`${config.origin}/v1/models`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${config.apiKey}` },
+        signal,
+      })
+    } catch (error) {
+      // 部分兼容站把模型列表放在 /models，404 时回退一次
+      if (error instanceof ApiError && error.status === 404) {
+        await request(`${config.origin}/models`, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${config.apiKey}` },
+          signal,
+        })
+        return
+      }
+      throw error
+    }
+    return
+  }
+  await request(`${config.origin}/models`, {
     method: 'GET',
-    headers: { Authorization: `Bearer ${apiKey}` },
+    headers: { Authorization: `Bearer ${config.apiKey}` },
     signal,
   })
 }
 
 /**
  * POST /anthropic/v1/files 上传附件（不设过期时间，会话里的历史附件一直可用）。
+ * 仅 Anthropic 协议使用；OpenAI 模式下图片经 base64 内联，不调用 Files API。
  * purpose 为 null 时不传该字段（图片）；purpose 必须排在 file 之前。
  */
 export const uploadFile = async (
-  apiKey: string,
+  config: Pick<ApiConfig, 'origin' | 'apiKey'>,
   file: File,
   purpose: FilePurpose | null,
   signal?: AbortSignal
@@ -113,9 +145,9 @@ export const uploadFile = async (
     form.append('purpose', purpose)
   }
   form.append('file', file)
-  const response = await request(`${ANTHROPIC_BASE_URL}/files`, {
+  const response = await request(`${anthropicBaseUrl(config.origin)}/files`, {
     method: 'POST',
-    headers: anthropicHeaders(apiKey, true),
+    headers: anthropicHeaders(config.apiKey, true),
     body: form,
     signal,
   })
@@ -123,10 +155,13 @@ export const uploadFile = async (
 }
 
 /** DELETE /anthropic/v1/files/{file_id} */
-export const deleteFile = async (apiKey: string, fileId: string): Promise<void> => {
-  await request(`${ANTHROPIC_BASE_URL}/files/${encodeURIComponent(fileId)}`, {
+export const deleteFile = async (
+  config: Pick<ApiConfig, 'origin' | 'apiKey'>,
+  fileId: string
+): Promise<void> => {
+  await request(`${anthropicBaseUrl(config.origin)}/files/${encodeURIComponent(fileId)}`, {
     method: 'DELETE',
-    headers: anthropicHeaders(apiKey, true),
+    headers: anthropicHeaders(config.apiKey, true),
   })
 }
 
@@ -138,18 +173,23 @@ const hasFile = (body: CreateMessageRequest) =>
   )
 
 /**
- * POST /anthropic/v1/messages（stream: true），逐个产出流式事件，收到 message_stop 时结束。
+ * POST 消息接口（stream: true），按协议分发：Anthropic 走 /anthropic/v1/messages，OpenAI 走 /v1/chat/completions。
+ * 逐个产出流式事件，收到 message_stop / [DONE] 时结束。
  * ping、保活注释与无法解析的内容不产出；中止请求时抛出 signal 的 AbortError。
  */
 export async function* streamMessage(
-  apiKey: string,
+  config: ApiConfig,
   body: CreateMessageRequest,
   signal: AbortSignal
 ): AsyncGenerator<MessageStreamEvent> {
-  const response = await request(`${ANTHROPIC_BASE_URL}/messages`, {
+  if (config.protocol === 'openai') {
+    yield* streamOpenAIMessage(config.origin, config.apiKey, body, config.model, signal)
+    return
+  }
+  const response = await request(`${anthropicBaseUrl(config.origin)}/messages`, {
     method: 'POST',
     headers: {
-      ...anthropicHeaders(apiKey, hasFile(body)),
+      ...anthropicHeaders(config.apiKey, hasFile(body)),
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
     },

@@ -3,6 +3,7 @@ import type { LinkedMessage, TranslationMessage } from '../i18n/index.js'
 import { uploadFile } from './api/client.js'
 import { classifyApiError, getUploadErrorInfo, isRetryableApiError } from './api/errors.js'
 import type { FilePurpose } from './api/types.js'
+import { useSettings } from './settings.js'
 import { ACCEPT_FILE_EXTS } from './uploadExts.js'
 
 /** 允许上传的扩展名，按扩展名白名单过滤，清单见 uploadExts.ts */
@@ -132,7 +133,16 @@ const enqueueUpload = (
       }
       try {
         const body = file instanceof File ? file : new File([file], name, { type: file.type })
-        resolve((await uploadFile(apiKey, body, getUploadPurpose(name, isImage), signal)).id)
+        resolve(
+          (
+            await uploadFile(
+              { origin: useSettings.getState().apiOrigin, apiKey },
+              body,
+              getUploadPurpose(name, isImage),
+              signal
+            )
+          ).id
+        )
       } catch (error) {
         reject(error)
       }

@@ -14,6 +14,7 @@ import styles from './MobileHeader.module.css'
 export const MobileHeader = ({ title }: { title?: string }) => {
   const t = useTranslate()
   const autoRead = useSettings((state) => state.autoRead)
+  const openaiMode = useSettings((state) => state.apiProtocol === 'openai')
   return (
     <div className={styles.header}>
       <IconButton
@@ -27,7 +28,7 @@ export const MobileHeader = ({ title }: { title?: string }) => {
       {title === undefined && !android ? null : (
         <>
           <div className={styles.title}>{title}</div>
-          {android ? (
+          {android && !openaiMode ? (
             <IconButton
               size="xl"
               tone="primary"

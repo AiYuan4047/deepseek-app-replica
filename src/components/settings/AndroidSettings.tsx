@@ -222,6 +222,7 @@ const Settings = ({ start }: { start: Page }) => {
   const t = useTranslate()
   const { locale, localePreference, themePreference, fontSize, foldThinking, ttsVoice } =
     useSettings()
+  const apiProtocol = useSettings((state) => state.apiProtocol)
   const tr = (chinese: string, english: string) => (locale === 'zh-CN' ? chinese : english)
   const [page, setPage] = useState<Page>(start)
   const [popup, setPopup] = useState<Popup | null>(null)
@@ -406,17 +407,19 @@ const Settings = ({ start }: { start: Page }) => {
                 onClick={() => setPage('personalization')}
               />
             </Group>
-            <Group label={tr('语音', 'Voice')}>
-              <Row
-                label={voice}
-                icon={<AndroidSound muted={false} />}
-                arrow={false}
-                onClick={() => {
-                  setTone(ttsVoice)
-                  setPopup('voice')
-                }}
-              />
-            </Group>
+            {apiProtocol === 'openai' ? null : (
+              <Group label={tr('语音', 'Voice')}>
+                <Row
+                  label={voice}
+                  icon={<AndroidSound muted={false} />}
+                  arrow={false}
+                  onClick={() => {
+                    setTone(ttsVoice)
+                    setPopup('voice')
+                  }}
+                />
+              </Group>
+            )}
             <Group label={tr('关于', 'About')}>
               <Row label={tr('版本信息', 'Version')} value={appVersion} icon={<Info />} />
               <Row

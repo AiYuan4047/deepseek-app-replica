@@ -62,6 +62,7 @@ const SettingsContent = () => {
   const [section, setSection] = useState(() => useSettingsDialog.getState().section)
   // 切换分组不丢失正在输入的 API Key 与导入状态
   const apiKeyEditor = useApiKeyEditor()
+  const apiProtocol = useSettings((state) => state.apiProtocol)
   const historyImport = useHistoryImport()
   const historyDelete = useHistoryDelete()
   const replacingHistory = useChatStore((state) => state.importingHistory)
@@ -99,7 +100,7 @@ const SettingsContent = () => {
             <>
               <ThemeSetting />
               <LocaleSetting />
-              <TtsVoiceSetting />
+              {apiProtocol === 'openai' ? null : <TtsVoiceSetting />}
               <LocationSetting />
             </>
           ) : (

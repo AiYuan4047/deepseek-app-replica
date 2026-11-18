@@ -3,10 +3,16 @@
   align-items: safe center;
   justify-content: center;
   box-sizing: border-box;
-  height: 100dvh;
+  height: 100vh;
   overflow: auto;
   padding: 24px;
   padding-top: calc(24px + var(--android-status-inset, 0px));
+}
+
+@supports (height: 100dvh) {
+  .page {
+    height: 100dvh;
+  }
 }
 
 .form {
@@ -56,6 +62,19 @@
   justify-self: center;
   color: var(--dsw-alias-brand-text);
   font-size: 14px;
+}
+
+.protocols {
+  display: flex;
+  gap: 8px;
+}
+
+.protocols button {
+  flex: 1;
+}
+
+.protocols button[aria-pressed='true'] {
+  background: var(--dsw-alias-brand-text);
 }
 
 .error {

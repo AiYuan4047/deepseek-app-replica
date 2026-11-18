@@ -68,6 +68,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const importingHistory = useChatStore((state) => state.importingHistory)
   const isMobile = useIsMobile()
   const search = useSettings((state) => state.search)
+  const openaiMode = useSettings((state) => state.apiProtocol === 'openai')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const togglesRef = useRef<HTMLDivElement>(null)
@@ -328,49 +329,53 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
           )}
         </div>
         <div className={styles.functionRow}>
-          {/* 深度思考 / 智能搜索开关，tooltip 在按钮上方 */}
-          <div ref={togglesRef} className={styles.toggles}>
-            <Tooltip content={t('deactivatedThinkTooltip')}>
-              <button
-                type="button"
-                className={clsx(styles.toggle, thinking && styles.selected)}
-                aria-label={t('thinkingSwitch')}
-                aria-pressed={thinking}
-                onClick={() => setThinking(!thinking)}
-              >
-                <IconThinkOutline14 />
-                <span className={styles.toggleLabel}>{t('thinkingSwitch')}</span>
-              </button>
-            </Tooltip>
-            <Tooltip content={t('deactivatedSearchTooltip')}>
-              <button
-                type="button"
-                className={clsx(styles.toggle, search && styles.selected)}
-                aria-label={t('search')}
-                aria-pressed={search}
-                onClick={() => setSearch(!search)}
-              >
-                <IconGlobeLanguageOutline14 />
-                <span className={styles.toggleLabel}>{t('search')}</span>
-              </button>
-            </Tooltip>
-          </div>
+          {/* 深度思考 / 智能搜索开关，tooltip 在按钮上方；OpenAI 模式无对应能力，隐藏 */}
+          {openaiMode ? null : (
+            <div ref={togglesRef} className={styles.toggles}>
+              <Tooltip content={t('deactivatedThinkTooltip')}>
+                <button
+                  type="button"
+                  className={clsx(styles.toggle, thinking && styles.selected)}
+                  aria-label={t('thinkingSwitch')}
+                  aria-pressed={thinking}
+                  onClick={() => setThinking(!thinking)}
+                >
+                  <IconThinkOutline14 />
+                  <span className={styles.toggleLabel}>{t('thinkingSwitch')}</span>
+                </button>
+              </Tooltip>
+              <Tooltip content={t('deactivatedSearchTooltip')}>
+                <button
+                  type="button"
+                  className={clsx(styles.toggle, search && styles.selected)}
+                  aria-label={t('search')}
+                  aria-pressed={search}
+                  onClick={() => setSearch(!search)}
+                >
+                  <IconGlobeLanguageOutline14 />
+                  <span className={styles.toggleLabel}>{t('search')}</span>
+                </button>
+              </Tooltip>
+            </div>
+          )}
           <div className={styles.right}>
             {android ? (
               <>
-                <IconButton
-                  size="xl"
-                  tone="primary"
-                  icon={<AndroidCircle icon={showAttachments ? 'close' : 'add'} />}
-                  aria-label={t(showAttachments ? 'close' : 'uploadFile')}
-                  aria-expanded={showAttachments}
-                  disabled={importingHistory}
-                  onClick={() => {
-                    textareaRef.current?.blur()
-                    setShowAttachments(!showAttachments)
-                  }}
-                />
-                {draftReady && (attachments.length === 0 || text.trim()) ? null : (
+                {openaiMode ? null : (
+                  <IconButton
+                    size="xl"
+                    tone="primary"
+                    icon={<AndroidCircle icon={showAttachments ? 'close' : 'add'} />}
+                    aria-label={t(showAttachments ? 'close' : 'uploadFile')}
+                    aria-expanded={showAttachments}
+                    disabled={importingHistory}
+                    onClick={() => {
+                      textareaRef.current?.blur()
+                      setShowAttachments(!showAttachments)
+                    }}
+                  />
+                )}
+                {openaiMode ? null : draftReady && (attachments.length === 0 || text.trim()) ? null : (
                   <IconButton
                     size="xl"
                     tone="primary"
@@ -386,27 +391,31 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
               </>
             ) : (
               <>
-                <VoiceButton
-                  status={voice.status}
-                  disabled={!voice.available}
-                  seconds={voice.seconds}
-                  onClick={() => {
-                    if (
-                      voice.status !== 'idle' ||
-                      (!useChatStore.getState().importingHistory && ensureApiKey())
-                    ) {
-                      void voice.toggle()
-                    }
-                  }}
-                />
-                <IconButton
-                  size="m"
-                  tone="primary"
-                  icon={<IconPaperclipOutline16 />}
-                  tooltip={t('uploadFile')}
-                  disabled={importingHistory}
-                  onClick={() => ensureApiKey() && fileInputRef.current?.click()}
-                />
+                {openaiMode ? null : (
+                  <VoiceButton
+                    status={voice.status}
+                    disabled={!voice.available}
+                    seconds={voice.seconds}
+                    onClick={() => {
+                      if (
+                        voice.status !== 'idle' ||
+                        (!useChatStore.getState().importingHistory && ensureApiKey())
+                      ) {
+                        void voice.toggle()
+                      }
+                    }}
+                  />
+                )}
+                {openaiMode ? null : (
+                  <IconButton
+                    size="m"
+                    tone="primary"
+                    icon={<IconPaperclipOutline16 />}
+                    tooltip={t('uploadFile')}
+                    disabled={importingHistory}
+                    onClick={() => ensureApiKey() && fileInputRef.current?.click()}
+                  />
+                )}
                 <input
                   ref={fileInputRef}
                   type="file"

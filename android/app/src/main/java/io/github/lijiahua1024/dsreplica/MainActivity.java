@@ -177,7 +177,7 @@ public final class MainActivity extends Activity {
                 Map<String, String> headers = Map.of("Content-Security-Policy",
                     "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
                     + "img-src 'self' https: data: blob:; font-src 'self' data:; "
-                    + "media-src 'self' blob:; connect-src 'self' https://api.deepseek.com; "
+                    + "media-src 'self' blob:; connect-src 'self' https:; "
                     + "frame-src 'none'; base-uri 'none'; form-action 'none';");
                 try {
                     return new WebResourceResponse(type == null ? "application/octet-stream" : type,
@@ -395,6 +395,12 @@ public final class MainActivity extends Activity {
 
         @JavascriptInterface
         public boolean writeApiKey(String value) { return keys.write(value); }
+
+        @JavascriptInterface
+        public String readApiConfig() { return keys.readConfig(); }
+
+        @JavascriptInterface
+        public boolean writeApiConfig(String value) { return keys.writeConfig(value); }
 
         @JavascriptInterface
         public void setDarkBars(boolean dark) { runOnUiThread(() -> setBars(dark)); }

@@ -17,6 +17,7 @@ import javax.crypto.spec.GCMParameterSpec;
 final class ApiKeyStore {
     private static final String KEY_ALIAS = "deepseek-api-key";
     private static final String VALUE = "encrypted";
+    private static final String VALUE_CONFIG = "config";
     private static final String TRANSFORMATION = "AES/GCM/NoPadding";
     private static final int IV_LENGTH = 12;
     private final SharedPreferences preferences;
@@ -26,7 +27,23 @@ final class ApiKeyStore {
     }
 
     String read() {
-        String stored = preferences.getString(VALUE, null);
+        return read(VALUE);
+    }
+
+    boolean write(String value) {
+        return write(VALUE, value);
+    }
+
+    String readConfig() {
+        return read(VALUE_CONFIG);
+    }
+
+    boolean writeConfig(String value) {
+        return write(VALUE_CONFIG, value);
+    }
+
+    private String read(String key) {
+        String stored = preferences.getString(key, null);
         if (stored == null) return null;
         try {
             byte[] bytes = Base64.decode(stored, Base64.NO_WRAP);
@@ -40,9 +57,9 @@ final class ApiKeyStore {
         }
     }
 
-    boolean write(String value) {
+    private boolean write(String key, String value) {
         if (value == null || value.isEmpty()) {
-            return preferences.edit().remove(VALUE).commit();
+            return preferences.edit().remove(key).commit();
         }
         try {
             Cipher cipher = Cipher.getInstance(TRANSFORMATION);
@@ -51,7 +68,7 @@ final class ApiKeyStore {
             byte[] encrypted = cipher.doFinal(value.getBytes(StandardCharsets.UTF_8));
             byte[] bytes = Arrays.copyOf(iv, iv.length + encrypted.length);
             System.arraycopy(encrypted, 0, bytes, iv.length, encrypted.length);
-            return preferences.edit().putString(VALUE, Base64.encodeToString(bytes, Base64.NO_WRAP))
+            return preferences.edit().putString(key, Base64.encodeToString(bytes, Base64.NO_WRAP))
                 .commit();
         } catch (GeneralSecurityException | java.io.IOException ignored) {
             return false;

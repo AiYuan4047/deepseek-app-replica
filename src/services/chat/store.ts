@@ -32,8 +32,11 @@ import {
   type UserMessage,
 } from './types.js'
 
-/** deepseek-flash 同时支持深度思考与图片输入 */
+/** deepseek-flash 同时支持深度思考与图片输入；模型可在设置中修改，这里只作类型默认值 */
 const MODEL: ChatModel = 'deepseek-flash'
+
+/** 当前设置的模型名（OpenAI 模式为任意字符串） */
+const currentModel = (): string => useSettings.getState().model
 /** 所有生成请求统一携带的助手身份说明 */
 const SYSTEM_PROMPT = '该助手为DeepSeek，由深度求索公司创造。'
 /** 保留最近打开的详情；当前会话、生成中及尚未成功保存的会话不淘汰。 */
@@ -260,7 +263,7 @@ const createReply = (): AssistantMessage => {
     id: createId(),
     role: 'assistant',
     createdAt: Date.now(),
-    model: MODEL,
+    model: currentModel(),
     thinking,
     search,
     prefix: true,
@@ -709,7 +712,7 @@ export const continueReply = (sessionId: string, messageId: string) => {
   const reply: AssistantMessage = {
     ...previous,
     // 未记录请求配置的回复，续写时使用默认模型和当前开关。
-    model: previous.model ?? MODEL,
+    model: previous.model ?? currentModel(),
     thinking: previous.thinking ?? thinking,
     search: previous.search ?? search,
     status: 'pending',
@@ -814,6 +817,10 @@ const refreshRequest = (sessionId: string, request: Request): Request => {
  *   失败静默跳过，该附件不进入本次请求，下次发送时再试。
  */
 const prepareFiles = async (sessionId: string, request: Request, signal: AbortSignal) => {
+  // OpenAI 兼容模式不走 Files API（图片内联不支持），跳过附件补传，附件在请求转换时忽略。
+  if (useSettings.getState().apiProtocol === 'openai') {
+    return refreshRequest(sessionId, request)
+  }
   const epoch = historyEpoch
   // 服务端判定 file_id 失效时会清掉会话里的 serverId，先用最新消息替换请求快照，
   // 否则快照里仍是旧 id，补传会直接复用它。
@@ -844,7 +851,7 @@ const prepareFiles = async (sessionId: string, request: Request, signal: AbortSi
   }
 
   const pending = new Map<string, FileAttachment>()
-  for (const [user] of getContextRounds(request.history).toReversed()) {
+  for (const [user] of [...getContextRounds(request.history)].reverse()) {
     for (const file of user.files) {
       if (!file.serverId && !serverIds.has(file.id) && !pending.has(file.id)) {
         pending.set(file.id, file)
@@ -997,7 +1004,12 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           latestReminder
         )
         const events = streamMessage(
-          useSettings.getState().apiKey ?? '',
+          {
+            origin: useSettings.getState().apiOrigin,
+            apiKey: useSettings.getState().apiKey ?? '',
+            model: currentModel(),
+            protocol: useSettings.getState().apiProtocol,
+          },
           {
             model: initial.model ?? MODEL,
             system: SYSTEM_PROMPT,

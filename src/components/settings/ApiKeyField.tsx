@@ -7,7 +7,7 @@ import { useApiKeyForm } from './useApiKeyForm.js'
 import { useTranslate } from '../../i18n/index.js'
 import styles from './Settings.module.css'
 
-/** API Key 的编辑状态：输入框与移动端底部的「确定」按钮共用 */
+/** API 配置的编辑状态：输入框与移动端底部的「确定」按钮共用 */
 export const useApiKeyEditor = () => {
   const apiKey = useSettings((state) => state.apiKey)
   const [editing, setEditing] = useState(false)
@@ -17,7 +17,7 @@ export const useApiKeyEditor = () => {
 
 type ApiKeyEditor = ReturnType<typeof useApiKeyEditor>
 
-/** API Key：保存后只显示掩码，点编辑按钮才能重新输入 */
+/** API 配置：保存后只显示掩码，点编辑按钮才能重新输入地址、Key、模型与协议 */
 export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
   const t = useTranslate()
   const isMobile = useIsMobile()
@@ -38,44 +38,83 @@ export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
             />
           </div>
         ) : (
-          <div className={styles.apiKeyInput}>
-            <input
-              type="password"
-              placeholder={t('apiKeyPlaceholder')}
-              autoComplete="off"
-              spellCheck={false}
-              // 移动端打开设置时不弹键盘，点编辑后才聚焦
-              autoFocus={!isMobile || editing}
-              value={form.value}
-              onChange={(event) => form.setValue(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                  void form.submit()
-                }
-              }}
-              onBlur={() => {
-                // 修改时没输入就离开，回到已保存的状态
-                if (apiKey && !form.value.trim()) {
-                  setEditing(false)
-                }
-              }}
-            />
-            {!isMobile && form.value.trim() ? (
-              <>
-                <span className={styles.divider} />
-                <button
-                  type="button"
-                  className={styles.confirm}
-                  disabled={form.verifying}
-                  // 保持输入框焦点
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => void form.submit()}
-                >
-                  {form.verifying ? t('apiKeyVerifying') : t('confirm')}
-                </button>
-              </>
+          <>
+            <div className={styles.protocols} role="radiogroup" aria-label={t('apiProtocolLabel')}>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={form.protocol === 'anthropic'}
+                aria-pressed={form.protocol === 'anthropic'}
+                onClick={() => form.setProtocol('anthropic')}
+              >
+                {t('apiProtocolAnthropic')}
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={form.protocol === 'openai'}
+                aria-pressed={form.protocol === 'openai'}
+                onClick={() => form.setProtocol('openai')}
+              >
+                {t('apiProtocolOpenAI')}
+              </button>
+            </div>
+            <div className={styles.apiKeyInput}>
+              <input
+                aria-label={t('apiOriginLabel')}
+                type="text"
+                placeholder={t('apiOriginPlaceholder')}
+                autoComplete="off"
+                spellCheck={false}
+                value={form.origin}
+                onChange={(event) => form.setOrigin(event.target.value)}
+              />
+            </div>
+            <div className={styles.apiKeyInput}>
+              <input
+                type="password"
+                placeholder={t('apiKeyPlaceholder')}
+                autoComplete="off"
+                spellCheck={false}
+                value={form.value}
+                onChange={(event) => form.setValue(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                    void form.submit()
+                  }
+                }}
+                onBlur={() => {
+                  // 修改时没输入就离开，回到已保存的状态
+                  if (apiKey && !form.value.trim()) {
+                    setEditing(false)
+                  }
+                }}
+              />
+            </div>
+            <div className={styles.apiKeyInput}>
+              <input
+                aria-label={t('modelLabel')}
+                type="text"
+                placeholder={t('modelPlaceholder')}
+                autoComplete="off"
+                spellCheck={false}
+                value={form.model}
+                onChange={(event) => form.setModelValue(event.target.value)}
+              />
+            </div>
+            {!isMobile ? (
+              <button
+                type="button"
+                className={styles.confirm}
+                disabled={form.verifying}
+                // 保持输入框焦点
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => void form.submit()}
+              >
+                {form.verifying ? t('apiKeyVerifying') : t('confirm')}
+              </button>
             ) : null}
-          </div>
+          </>
         )}
         {showInput && form.error ? <div className={styles.error}>{form.error}</div> : null}
       </div>
@@ -83,10 +122,11 @@ export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
   )
 }
 
-/** 移动端：输入 API Key 时在选项下方显示整行「确定」 */
-export const ApiKeyConfirm = ({ editor: { showInput, form } }: { editor: ApiKeyEditor }) => {
+/** 移动端：输入 API 配置时在选项下方显示整行「确定」 */
+export const ApiKeyConfirm = ({ editor: { apiKey, showInput, form } }: { editor: ApiKeyEditor }) => {
   const t = useTranslate()
-  return showInput && form.value.trim() ? (
+  const ready = form.origin.trim() && form.model.trim() && (form.value.trim() || Boolean(apiKey))
+  return showInput && ready ? (
     <button
       type="button"
       className={styles.mobileConfirm}

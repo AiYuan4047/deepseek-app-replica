@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { android } from '../app/android.js'
+import { android, readApiConfigValue, writeApiConfigValue } from '../app/android.js'
 import type { TtsVoice } from './api/speech.js'
 import { normalizeLocation, type UserLocation } from './location.js'
 
@@ -9,9 +9,19 @@ export type LocalePreference = Locale | 'system'
 /** 主题偏好；默认跟随系统 */
 export type ThemePreference = 'light' | 'dark' | 'system'
 
-/** 本机设置，存 localStorage：API Key、语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态 */
+/** 接口协议：DeepSeek/Anthropic 兼容或通用 OpenAI 兼容 */
+export type ApiProtocol = 'anthropic' | 'openai'
+
+/** 默认 API 地址与模型，兼容 DeepSeek 官方 */
+export const DEFAULT_API_ORIGIN = 'https://api.deepseek.com'
+export const DEFAULT_MODEL = 'deepseek-flash'
+
+/** 本机设置，存 localStorage：API 配置、语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态 */
 type Settings = {
+  apiOrigin: string
   apiKey: string | null
+  model: string
+  apiProtocol: ApiProtocol
   locale: Locale
   localePreference: LocalePreference
   themePreference: ThemePreference
@@ -27,7 +37,10 @@ type Settings = {
 }
 
 const KEYS = {
+  apiOrigin: 'chat-demo:api-origin',
   apiKey: 'chat-demo:api-key',
+  model: 'chat-demo:model',
+  apiProtocol: 'chat-demo:api-protocol',
   locale: 'chat-demo:locale',
   location: 'chat-demo:location',
   themePreference: 'chat-demo:theme-preference',
@@ -119,7 +132,14 @@ const initialThemePreference = (): ThemePreference => {
 const initialTtsVoice = (): TtsVoice => (read(KEYS.ttsVoice) === 'tide' ? 'tide' : 'stella')
 
 export const useSettings = create<Settings>(() => ({
+  apiOrigin: android ? (readApiConfigValue()?.origin ?? DEFAULT_API_ORIGIN) : (read(KEYS.apiOrigin) ?? DEFAULT_API_ORIGIN),
   apiKey: android ? android.readApiKey() : read(KEYS.apiKey),
+  model: android ? (readApiConfigValue()?.model ?? DEFAULT_MODEL) : (read(KEYS.model) ?? DEFAULT_MODEL),
+  apiProtocol: android
+    ? (readApiConfigValue()?.protocol ?? 'anthropic')
+    : read(KEYS.apiProtocol) === 'openai'
+      ? 'openai'
+      : 'anthropic',
   locale: resolveLocale(initialLocalePreference()),
   localePreference: initialLocalePreference(),
   location: initialLocation(),
@@ -183,6 +203,41 @@ export const setApiKey = (apiKey: string | null) => {
   }
   useSettings.setState({ apiKey })
   return true
+}
+
+export const setApiOrigin = (apiOrigin: string) => {
+  const origin = apiOrigin.trim().replace(/\/+$/, '')
+  if (!origin) {
+    return
+  }
+  if (android) {
+    writeApiConfigValue({ origin, model: useSettings.getState().model, protocol: useSettings.getState().apiProtocol })
+  } else {
+    write(KEYS.apiOrigin, origin)
+  }
+  useSettings.setState({ apiOrigin: origin })
+}
+
+export const setModel = (model: string) => {
+  const value = model.trim()
+  if (!value) {
+    return
+  }
+  if (android) {
+    writeApiConfigValue({ origin: useSettings.getState().apiOrigin, model: value, protocol: useSettings.getState().apiProtocol })
+  } else {
+    write(KEYS.model, value)
+  }
+  useSettings.setState({ model: value })
+}
+
+export const setApiProtocol = (apiProtocol: ApiProtocol) => {
+  if (android) {
+    writeApiConfigValue({ origin: useSettings.getState().apiOrigin, model: useSettings.getState().model, protocol: apiProtocol })
+  } else {
+    write(KEYS.apiProtocol, apiProtocol)
+  }
+  useSettings.setState({ apiProtocol })
 }
 
 export const setThinking = (thinking: boolean) => {

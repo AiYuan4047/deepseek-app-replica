@@ -18,6 +18,36 @@ export const ApiKeyScreen = () => {
       >
         <img className={styles.whale} src={whale} alt="" />
         <h1>{t('apiKeyStart')}</h1>
+        <div className={styles.protocols} role="radiogroup" aria-label={t('apiProtocolLabel')}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={form.protocol === 'anthropic'}
+            aria-pressed={form.protocol === 'anthropic'}
+            onClick={() => form.setProtocol('anthropic')}
+          >
+            {t('apiProtocolAnthropic')}
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={form.protocol === 'openai'}
+            aria-pressed={form.protocol === 'openai'}
+            onClick={() => form.setProtocol('openai')}
+          >
+            {t('apiProtocolOpenAI')}
+          </button>
+        </div>
+        <input
+          aria-label={t('apiOriginLabel')}
+          type="text"
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          placeholder={t('apiOriginPlaceholder')}
+          value={form.origin}
+          onChange={(event) => form.setOrigin(event.target.value)}
+        />
         <input
           aria-label="DeepSeek API Key"
           aria-invalid={Boolean(form.error)}
@@ -30,8 +60,22 @@ export const ApiKeyScreen = () => {
           value={form.value}
           onChange={(event) => form.setValue(event.target.value)}
         />
+        <input
+          aria-label={t('modelLabel')}
+          type="text"
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          enterKeyHint="go"
+          placeholder={t('modelPlaceholder')}
+          value={form.model}
+          onChange={(event) => form.setModelValue(event.target.value)}
+        />
         {form.error ? <div role="alert" className={styles.error}>{form.error}</div> : null}
-        <button type="submit" disabled={form.verifying || !form.value.trim()}>
+        <button
+          type="submit"
+          disabled={form.verifying || !form.origin.trim() || !form.value.trim() || !form.model.trim()}
+        >
           {t(form.verifying ? 'apiKeyVerifying' : 'confirm')}
         </button>
         <a href="https://platform.deepseek.com/api_keys">{t('apiKeyGet')}</a>
