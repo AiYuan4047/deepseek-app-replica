@@ -1,6 +1,7 @@
 package io.github.lijiahua1024.dsreplica;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
@@ -100,11 +101,23 @@ public final class MainActivity extends Activity {
         webView.setWebViewClient(new AppPage());
         webView.setWebChromeClient(new DeviceFeatures());
         webView.addJavascriptInterface(new DeviceBridge(), "DeepSeekAndroid");
-        getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
-            OnBackInvokedDispatcher.PRIORITY_DEFAULT, () -> webView.evaluateJavascript(
-                "window.dispatchEvent(new Event('android-back', {cancelable: true}))",
-                result -> { if ("true".equals(result)) finish(); }));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::handleBack);
+        }
         webView.loadUrl(HOME);
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    @SuppressLint("GestureBackNavigation") // API 33+ back gestures use the registered callback.
+    public void onBackPressed() {
+        handleBack();
+    }
+
+    private void handleBack() {
+        webView.evaluateJavascript("window.dispatchEvent(new Event('android-back', {cancelable: true}))",
+            result -> { if ("true".equals(result)) finish(); });
     }
 
     private void setBars(boolean dark) {

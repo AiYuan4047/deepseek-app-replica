@@ -5,7 +5,8 @@ import { defineConfig } from '@rspack/cli'
 import { rspack, type Configuration } from '@rspack/core'
 
 const dev = process.env.NODE_ENV === 'development' || process.argv.includes('serve')
-const targets = ['chrome >= 105', 'edge >= 105', 'safari >= 16', 'firefox >= 110']
+// Android 11 ships with an older WebView that can be updated independently of the OS.
+const targets = ['chrome >= 83', 'edge >= 105', 'safari >= 16', 'firefox >= 110']
 const root = path.dirname(fileURLToPath(import.meta.url))
 const { version } = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf8')
@@ -29,6 +30,7 @@ export const createConfig = ({
   devServer,
 }: ConfigOptions = {}): Configuration => ({
   mode: dev ? 'development' : 'production',
+  target: `browserslist: ${targets.join(', ')}`,
   entry: './src/main.tsx',
   output: {
     path: path.resolve(root, 'dist'),
@@ -57,16 +59,17 @@ export const createConfig = ({
       { test: /\.module\.css$/, type: 'css/module', use: [cssLoader] },
       { test: /\.css$/, exclude: /\.module\.css$/, type: 'css', use: [cssLoader] },
       {
-        test: /\.(j|t)sx?$/,
-        exclude: /[\\/]node_modules[\\/]/,
+        test: /\.(?:[cm]?js|jsx|tsx?)$/,
+        exclude: /[\\/]node_modules[\\/]core-js[\\/]/,
         loader: 'builtin:swc-loader',
         options: {
+          detectSyntax: 'auto',
+          isModule: 'unknown',
           jsc: {
-            parser: { syntax: 'typescript', tsx: true },
             transform: { react: { runtime: 'automatic', development: dev } },
             externalHelpers: true,
           },
-          env: { targets },
+          env: { targets, mode: 'usage', coreJs: '3.51' },
         },
         type: 'javascript/auto',
       },
