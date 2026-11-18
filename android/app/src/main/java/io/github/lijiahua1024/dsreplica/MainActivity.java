@@ -16,6 +16,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.util.Base64;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.webkit.JavascriptInterface;
@@ -31,8 +32,17 @@ import android.widget.FrameLayout;
 import android.window.OnBackInvokedDispatcher;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import org.json.JSONObject;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -50,6 +60,11 @@ public final class MainActivity extends Activity {
     private ValueCallback<Uri[]> fileCallback;
     private boolean keyboardVisible;
     private volatile float statusInset;
+    /** 当前 API 地址（协议 + 主机 + 前缀路径）；代理请求转发到它 */
+    private volatile String apiTarget = "";
+    /** 进行中的代理请求；取消时中断连接 */
+    private final Map<String, HttpURLConnection> apiCalls = new ConcurrentHashMap<>();
+    private final ExecutorService apiExecutor = Executors.newCachedThreadPool();
     private boolean askedForPhotos;
     private Uri capture;
     private RecentPhotos recentPhotos;
@@ -135,6 +150,70 @@ public final class MainActivity extends Activity {
     private static boolean isBundled(Uri url) {
         return "https".equals(url.getScheme()) && ASSET_HOST.equals(url.getHost())
             && url.getPort() == -1;
+    }
+
+    /** 把 JS 发起的 API 请求转发到当前 API 地址，增量与结果回传给页面 */
+    private void apiHandle(String id, String method, String path, String headersJson, String body) {
+        String target = apiTarget;
+        if (target.isEmpty()) {
+            apiResult("window.__dsApiEnd('" + id + "', -1, \"{}\")");
+            return;
+        }
+        HttpURLConnection connection = null;
+        try {
+            URL endpoint = new URL(target + (path == null || path.isEmpty() ? "/" : path));
+            connection = (HttpURLConnection) endpoint.openConnection();
+            apiCalls.put(id, connection);
+            connection.setRequestMethod(method);
+            connection.setConnectTimeout(20000);
+            connection.setReadTimeout(0);
+            connection.setInstanceFollowRedirects(false);
+            JSONObject headers = new JSONObject(headersJson == null ? "{}" : headersJson);
+            Iterator<String> names = headers.keys();
+            while (names.hasNext()) {
+                String name = names.next();
+                if ("Host".equalsIgnoreCase(name) || "Connection".equalsIgnoreCase(name)
+                        || "Content-Length".equalsIgnoreCase(name)) continue;
+                connection.setRequestProperty(name, headers.optString(name, ""));
+            }
+            if (body != null && !body.isEmpty() && !"GET".equalsIgnoreCase(method)) {
+                connection.setDoOutput(true);
+                try (OutputStream out = connection.getOutputStream()) {
+                    out.write(body.getBytes(StandardCharsets.UTF_8));
+                }
+            }
+            connection.connect();
+            int status = connection.getResponseCode();
+            JSONObject headersOut = new JSONObject();
+            for (Map.Entry<String, List<String>> entry : connection.getHeaderFields().entrySet()) {
+                String name = entry.getKey();
+                if (name == null) continue;
+                if (name.startsWith("Content-Encoding") || name.startsWith("Content-Length")
+                        || name.startsWith("Transfer-Encoding") || name.startsWith("Connection")) continue;
+                List<String> values = entry.getValue();
+                if (values != null && !values.isEmpty()) headersOut.put(name, values.get(0));
+            }
+            InputStream stream = status >= 400 ? connection.getErrorStream()
+                : connection.getInputStream();
+            if (stream == null) stream = new ByteArrayInputStream(new byte[0]);
+            byte[] buffer = new byte[16384];
+            int read;
+            while ((read = stream.read(buffer)) >= 0) {
+                String chunk = Base64.encodeToString(Arrays.copyOf(buffer, read), Base64.NO_WRAP);
+                apiResult("window.__dsApiData('" + id + "', '" + chunk + "')");
+            }
+            apiResult("window.__dsApiEnd('" + id + "', " + status + ", "
+                + headersOut.toString() + ")");
+        } catch (Exception ignored) {
+            apiResult("window.__dsApiEnd('" + id + "', -1, \"{}\")");
+        } finally {
+            apiCalls.remove(id);
+            if (connection != null) connection.disconnect();
+        }
+    }
+
+    private void apiResult(String script) {
+        webView.post(() -> webView.evaluateJavascript(script, null));
     }
 
     private final class AppPage extends WebViewClient {
@@ -401,6 +480,21 @@ public final class MainActivity extends Activity {
 
         @JavascriptInterface
         public boolean writeApiConfig(String value) { return keys.writeConfig(value); }
+
+        @JavascriptInterface
+        public void setApiTarget(String origin) { apiTarget = origin == null ? "" : origin; }
+
+        @JavascriptInterface
+        public void apiBegin(String id, String method, String path,
+                             String headersJson, String body) {
+            apiExecutor.execute(() -> apiHandle(id, method, path, headersJson, body));
+        }
+
+        @JavascriptInterface
+        public void apiCancel(String id) {
+            HttpURLConnection connection = apiCalls.remove(id);
+            if (connection != null) connection.disconnect();
+        }
 
         @JavascriptInterface
         public void setDarkBars(boolean dark) { runOnUiThread(() -> setBars(dark)); }

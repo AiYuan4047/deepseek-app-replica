@@ -1,4 +1,5 @@
 import { translate, type TranslationMessage } from '../../i18n/index.js'
+import { android, androidApiRequest } from '../../app/android.js'
 import { openAIPath, streamOpenAIMessage } from './openai.js'
 import { readMessageEvent } from './parseEvent.js'
 import { readServerSentEvents } from './sse.js'
@@ -76,7 +77,7 @@ const readErrorResponse = async (
 export const request = async (url: string, init: RequestInit): Promise<Response> => {
   let response: Response
   try {
-    response = await fetch(url, init)
+    response = android ? await androidApiRequest(url, init) : await fetch(url, init)
   } catch (error) {
     if (init.signal?.aborted) {
       throw error
