@@ -47,7 +47,6 @@ type Page =
   | 'font'
   | 'personalization'
   | 'agreements'
-  | 'shared'
   | 'help'
 type Popup = 'locale' | 'theme' | 'voice' | 'logout' | 'delete' | 'import'
 
@@ -243,7 +242,6 @@ const Settings = ({ start }: { start: Page }) => {
     font: tr('字体大小', 'Text size'),
     personalization: tr('个性化', 'Personalization'),
     agreements: tr('服务协议', 'Terms and policies'),
-    shared: tr('我共享的链接', 'Shared links'),
     help: tr('帮助与反馈', 'Help and feedback'),
   }
   const language = tr('语言', 'Language')
@@ -253,7 +251,6 @@ const Settings = ({ start }: { start: Page }) => {
   const follow = tr('跟随系统', 'Follow system')
   const logout = tr('退出登录', 'Sign out')
   const clear = tr('删除所有历史对话', 'Delete all conversations')
-  const optimize = tr('数据用于优化体验', 'Use data to improve the experience')
   const themes: { id: ThemePreference; label: string }[] = [
     { id: 'system', label: tr('系统', 'System') },
     { id: 'light', label: tr('浅色', 'Light') },
@@ -291,7 +288,7 @@ const Settings = ({ start }: { start: Page }) => {
     } else if (page === 'root') {
       closeSettings()
     } else {
-      setPage(page === 'shared' || page === 'export' ? 'data' : 'root')
+      setPage(page === 'export' ? 'data' : 'root')
     }
   }
 
@@ -458,18 +455,12 @@ const Settings = ({ start }: { start: Page }) => {
         ) : null}
         {page === 'data' ? (
           <>
-            <Group>
-              <Row label={optimize} control={<Switch label={optimize} checked={false} />} />
-            </Group>
             <p className={styles.caption}>
               {tr(
                 '历史对话保存在此设备。API 数据处理适用 DeepSeek 开放平台隐私政策。',
                 'Chat history is stored on this device. API usage is subject to the DeepSeek Open Platform Privacy Policy.'
               )}
             </p>
-            <Group>
-              <Row label={labels.shared} disabled={busy} onClick={() => setPage('shared')} />
-            </Group>
             <Group>
               <Row label={labels.export} disabled={busy} onClick={() => setPage('export')} />
             </Group>
@@ -607,9 +598,6 @@ const Settings = ({ start }: { start: Page }) => {
               onClick={() => android?.openAppPermissions()}
             />
           </Group>
-        ) : null}
-        {page === 'shared' ? (
-          <p className={styles.empty}>{tr('暂无共享链接', 'No shared links')}</p>
         ) : null}
         {page === 'help' ? (
           <Group>
