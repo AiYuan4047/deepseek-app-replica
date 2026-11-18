@@ -37,6 +37,7 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   const [now, setNow] = useState(Date.now)
   const [selecting, setSelecting] = useState(false)
   const [checked, setChecked] = useState<Set<string>>(() => new Set())
+  const [pinning, setPinning] = useState<{ ids: Set<string>; unpin: boolean } | null>(null)
   const unpin = checked.size > 0 && [...checked].every((id) => pinnedIds.includes(id))
   const groups = useMemo(() => {
     if (!androidDrawer || pinnedIds.length === 0) {
@@ -58,6 +59,7 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   const closeSelection = () => {
     setSelecting(false)
     setChecked(new Set())
+    setPinning(null)
   }
 
   useEffect(() => {
@@ -94,7 +96,9 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
     <div className={clsx(styles.sider, mobile && styles.mobile)}>
       {androidDrawer && selecting ? (
         <div className={styles.selectionHeader}>
-          {t('androidSelectChats')}
+          {checked.size
+            ? t('androidSelectedChats', { count: checked.size })
+            : t('androidSelectChats')}
           <IconButton
             tone="primary"
             icon={<IconCloseOutline16 />}
@@ -202,14 +206,7 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
             <button
               type="button"
               disabled={!checked.size}
-              onClick={() => {
-                setPinnedSessions(
-                  unpin
-                    ? pinnedIds.filter((id) => !checked.has(id))
-                    : [...new Set([...pinnedIds, ...checked])]
-                )
-                closeSelection()
-              }}
+              onClick={() => setPinning({ ids: checked, unpin })}
             >
               <svg
                 width="18"
@@ -262,6 +259,38 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
           </button>
         )}
       </div>
+      {pinning ? (
+        <Modal
+          title={t(pinning.unpin ? 'androidUnpinConfirm' : 'androidPinConfirm', {
+            count: pinning.ids.size,
+          })}
+          onClose={() => setPinning(null)}
+          footer={
+            <>
+              <Button variant="outlined" onClick={() => setPinning(null)}>
+                {t(pinning.unpin ? 'androidKeepPinned' : 'cancel')}
+              </Button>
+              <Button
+                onClick={() => {
+                  const ids = sessions.filter((session) => pinning.ids.has(session.id))
+                  setPinnedSessions(
+                    pinning.unpin
+                      ? pinnedIds.filter((id) => !pinning.ids.has(id))
+                      : [...new Set([...pinnedIds, ...ids.map(({ id }) => id)])]
+                  )
+                  showToast({
+                    key: pinning.unpin ? 'androidUnpinnedChats' : 'androidPinnedChats',
+                    params: { count: ids.length },
+                  })
+                  closeSelection()
+                }}
+              >
+                {t(pinning.unpin ? 'androidUnpin' : 'androidPinned')}
+              </Button>
+            </>
+          }
+        />
+      ) : null}
       {deleting.length ? (
         <Modal
           title={t('deleteSessionModalContentTitle')}
